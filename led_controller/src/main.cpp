@@ -5,20 +5,24 @@
 #define CLOCK_PIN D6 // CLK
 #define LATCH_PIN D7 // LE
 
+// Forward declaration of sendData
+void sendData(uint16_t data);
+
 void setup() {
   pinMode(DATA_PIN, OUTPUT);
   pinMode(CLOCK_PIN, OUTPUT);
   pinMode(LATCH_PIN, OUTPUT);
+
+  // Erstes Bit ist letztes 
+  // sendData(0b000000001000000000); // Setze den ersten Pin auf HIGH (Bit 1)
 }
 
 void loop() {
-  // Muster 1: 10101010 10101010
-  sendData(0b1010101010101010);
-  delay(500);
-  
-  // Muster 2: 01010101 01010101
-  sendData(0b0101010101010101);
-  delay(500);
+  /*for (int i = 0; i < 16; i++) {
+    sendData(1 << i); // Shift a single bit to create the running light
+    delay(1000);
+  }*/
+ delay(1000);
 }
 
 // sendet 16 Bit an das Register
