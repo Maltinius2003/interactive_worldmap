@@ -1,49 +1,43 @@
 #include <Arduino.h>
+#include <ESP8266TimerInterrupt.h>
 
 // Pins am ESP8266 (NodeMCU z.B.)
 #define DATA_PIN D5  // SDI
 #define CLOCK_PIN D6 // CLK
 #define LATCH_PIN D7 // LE
 
-// Timer variables
-unsigned long previousMillis = 0;
-const unsigned long interval = 5;
-
-// Forward declaration of sendData
 void sendData(uint16_t data);
 void toggleLED0();
 void onLED0();
 void offLED0();
+
+volatile bool toggle = false;
+volatile int callCount = 0; // Counter to track the number of calls
+
+void IRAM_ATTR timer1ISR() {
+  callCount++;
+}
 
 void setup() {
   pinMode(DATA_PIN, OUTPUT);
   pinMode(CLOCK_PIN, OUTPUT);
   pinMode(LATCH_PIN, OUTPUT);
 
-  // Erstes Bit ist letztes 
-  // sendData(0b000000001000000000); // Setze den ersten Pin auf HIGH (Bit 1)
+  timer1_isr_init();
+  timer1_attachInterrupt(timer1ISR);
+  timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
+  timer1_write(707);
 }
 
 void loop() {
-  /*for (int i = 0; i < 16; i++) {
-    sendData(1 << i); // Shift a single bit to create the running light
-    delay(1000);
-  }
- delay(1000);*/
-
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    
-    // Turn on LEDO every 210 th time the timer ticks
-    if (currentMillis % 210 == 0) {
-      onLED0(); // Call the function to turn on LED0
+  
+    if(callCount % 210 == 0){
+      onLED0();
+      callCount = 0; 
     } else {
-      offLED0(); // Call the function to turn off LED0
+      offLED0();
     }
-  }
-
-
+    
 }
 
 // sendet 16 Bit an das Register
@@ -78,15 +72,3 @@ void onLED0() {
 void offLED0() {
   sendData(0b000000000000000000); // Set the first LED off
 }
-
-
-
-
-
-/*void loop() {
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    test(); // Call the test function every 2 seconds
-  }
-}*/
