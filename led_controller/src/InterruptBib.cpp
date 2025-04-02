@@ -16,6 +16,13 @@ volatile int callCount = 0; // Counter to track the number of calls
 
 void IRAM_ATTR timer1ISR() {
   callCount++;
+
+  if(callCount % 210 == 0){
+    onLED0();
+    callCount = 0; 
+  } else {
+    offLED0();
+  }
 }
 
 void setup() {
@@ -26,18 +33,13 @@ void setup() {
   timer1_isr_init();
   timer1_attachInterrupt(timer1ISR);
   timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
-  timer1_write(707);
+  timer1_write(2350);
 }
 
 void loop() {
   
-    if(callCount % 210 == 0){
-      onLED0();
-      callCount = 0; 
-    } else {
-      offLED0();
-    }
     
+
 }
 
 // sendet 16 Bit an das Register
