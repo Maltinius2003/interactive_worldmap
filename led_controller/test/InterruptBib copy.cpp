@@ -6,7 +6,7 @@
 #define CLOCK_PIN D6 // CLK
 #define LATCH_PIN D7 // LE
 
-void sendData(uint16_t data);
+void writeRegData(uint16_t data);
 void toggleLED0();
 void onLED0();
 void offLED0();
@@ -45,7 +45,7 @@ void loop() {
 }
 
 // sendet 16 Bit an das Register
-void sendData(uint16_t data) {
+void writeRegData(uint16_t data) {
   digitalWrite(LATCH_PIN, LOW); // Latch deaktivieren
 
   for (int i = 15; i >= 0; i--) {
@@ -63,16 +63,16 @@ void toggleLED0() {
   static bool ledState = false; // Static variable to hold the LED state
   ledState = !ledState; // Toggle the state
   if (ledState) {
-    sendData(0b000000000000000001);
+    writeRegData(0b000000000000000001);
   } else {
-    sendData(0b000000000000000000);
+    writeRegData(0b000000000000000000);
   }
 }
 
 void onLED0() {
-  sendData(0b000000000000000001); // Set the first LED on
+  writeRegData(0b000000000000000001); // Set the first LED on
 }
 
 void offLED0() {
-  sendData(0b000000000000000000); // Set the first LED off
+  writeRegData(0b000000000000000000); // Set the first LED off
 }

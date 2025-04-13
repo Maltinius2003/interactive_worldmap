@@ -1,31 +1,93 @@
-#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <espnow.h>
 
-const int ledPin = D5;  // Pin D5 auf dem ESP8266 (NodeMCU)
-const int hallPinDigital = D2;
-const int hallPinAnalog = A0;  // Pin A0 auf dem ESP8266 (NodeMCU) für den Hall-Sensor
+const int buttonPin = D2; // Pin, an dem der Button angeschlossen ist
+bool buttonState = HIGH;  // Aktueller Zustand des Buttons
+bool previousButtonState = HIGH; // Vorheriger Zustand des Buttons
 
-int hallSensorValue = 0;  // Variable für den Hall-Sensor-Wert
+uint8_t broadcastAddress[] = { 0x08, 0x3A, 0x8D, 0xCD, 0x66, 0xAF };
+
+const int dataSize = 13;
+typedef struct struct_message {
+  bool data[dataSize];
+} struct_message;
+
+struct_message toSendStruct;
+struct_message receivedStruct;
+
+// Callback, wenn Daten gesendet werden
+void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
+  Serial.print("Last Packet Send Status: ");
+  Serial.println(sendStatus == 0 ? "Delivery success" : "Delivery fail");
+}
+
+// Callback, wenn Daten empfangen werden
+void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
+  Serial.print("Received packet from: ");
+  for (int i = 0; i < 6; i++) {
+    Serial.print(mac_addr[i], HEX);
+    if (i < 5) Serial.print(":");
+  }
+  Serial.println();
+
+  memcpy(&receivedStruct, incomingData, sizeof(receivedStruct));
+  Serial.println("Received data:");
+  for (int i = 0; i < dataSize; i++) {
+    Serial.print("Data[");
+    Serial.print(i);
+    Serial.print("]: ");
+    Serial.println(receivedStruct.data[i]);
+  }
+}
 
 void setup() {
-  // Initialisiere den LED-Pin als Ausgang
-  pinMode(ledPin, OUTPUT);
-  pinMode(hallPinDigital, INPUT);  // Initialisiere den digitalen Hall-Sensor-Pin als Eingang
-  // pinMode(hallPinAnalog, INPUT);   // Initialisiere den analogen Hall-Sensor-Pin als Eingang
-  Serial.begin(9600);  // Initialisiere die serielle Kommunikation mit 9600 Baud
-  Serial.println("Hall-Sensor-Test gestartet...");
+  // Init Serial Monitor
+  Serial.begin(9600);
+
+  // Button-Pin als Eingang setzen
+  pinMode(buttonPin, INPUT_PULLUP);
+
+  // Set device as a Wi-Fi Station
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
+  // Init ESP-NOW
+  if (esp_now_init() != 0) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+
+  // Set ESP-NOW Role
+  esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
+
+  // Register Send Callback
+  esp_now_register_send_cb(OnDataSent);
+
+  // Register Receive Callback
+  esp_now_register_recv_cb(OnDataRecv);
+
+  // Register peer
+  esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
 }
 
 void loop() {
+  // Button-Zustand einlesen
+  buttonState = digitalRead(buttonPin);
 
-  hallSensorValue = digitalRead(hallPinDigital);  // Lese den digitalen Hall-Sensor-Wert
-  Serial.println("Hall-Sensor-Wert: " + String(hallSensorValue));  // Gebe den Wert auf der seriellen Konsole aus
+  // Prüfen, ob sich der Zustand geändert hat
+  if (buttonState != previousButtonState) {
+    Serial.print("Button state changed to: ");
+    Serial.println(buttonState);
 
-  // Schalte die LED ein
-  digitalWrite(ledPin, HIGH);
-  delay(100);  // 1 Sekunde warten
+    // Erste Stelle des Arrays mit dem Button-Zustand aktualisieren
+    toSendStruct.data[0] = (buttonState == LOW); // LOW bedeutet gedrückt
 
-  // Schalte die LED aus
-  digitalWrite(ledPin, LOW);
-  delay(100);  // 1 Sekunde warten
+    // Nachricht senden
+    esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
 
+    // Vorherigen Zustand aktualisieren
+    previousButtonState = buttonState;
+  }
+
+  delay(20); // Entprellung
 }

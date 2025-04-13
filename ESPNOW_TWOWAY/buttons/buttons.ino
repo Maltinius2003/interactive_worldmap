@@ -1,8 +1,8 @@
 #include <ESP8266WiFi.h>
 #include <espnow.h>
-#include <OneButton.h>
-#include <PCF8574.h>
 
+const int buttonPin = D1; // Pin, an dem der Button angeschlossen ist
+bool buttonState = HIGH;  // Aktueller Zustand des Buttons
 PCF8574 m1(0x38);  // Address of the first PCF8574 IO expander
 PCF8574 m2(0x3C);  // Address of the second PCF8574 IO expander
 
