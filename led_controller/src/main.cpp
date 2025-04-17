@@ -19,7 +19,7 @@ uint8_t broadcastAddress[] = { 0x44, 0x17, 0x93, 0x1B, 0xB0, 0x6F };
 
 uint16_t reg_data = 0b0000000000000000; // Registerdaten
 
-void writeRegData(uint16_t data);
+void writeRegData();
 void toggleLED0();
 void onLED0();
 void offLED0();
@@ -117,18 +117,18 @@ void toggleLED0() {
   static bool ledState = false; // Static variable to hold the LED state
   ledState = !ledState; // Toggle the state
   if (ledState) {
-    writeRegData(0b0000000000000001);
+    onLED0(); // Turn on LED0
   } else {
-    writeRegData(0b0000000000000000);
+    offLED0(); // Turn off LED0
   }
 }
 
 void onLED0() {
   reg_data |= 0b0000000000000001; // Set the first bit to 1
-  writeRegData(reg_data);
+  writeRegData();
 }
 
 void offLED0() {
   reg_data &= ~0b0000000000000001; // Clear the first bit to 0
-  writeRegData(reg_data);
+  writeRegData();
 }
