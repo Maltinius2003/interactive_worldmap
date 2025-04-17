@@ -1,15 +1,17 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <espnow.h>
+#include <ESP8266TimerInterrupt.h>
 
-// Pins am ESP8266 (NodeMCU z.B.)
+// Pins am ESP8266 
 #define DATA_PIN D5  // SDI
 #define CLOCK_PIN D6 // CLK
 #define LATCH_PIN D7 // LE
 
-const int dataSize = 13;
+const int dataSize = 3;
+
 typedef struct struct_message {
-  bool data[dataSize];
+  byte data[dataSize];
 } struct_message;
 
 struct_message receivedStruct;
@@ -18,11 +20,30 @@ struct_message toSendStruct;
 uint8_t broadcastAddress[] = { 0x44, 0x17, 0x93, 0x1B, 0xB0, 0x6F };
 
 uint16_t reg_data = 0b0000000000000000; // Registerdaten
+uint16_t test_data = 0b0000000000000000; // Testdaten
 
 void writeRegData();
 void toggleLED0();
 void onLED0();
 void offLED0();
+void onLED1();
+void offLED1();
+void onLED15();
+void offLED15();
+
+volatile bool toggle = false;
+volatile int callCount = 0; // Counter to track the number of calls
+
+void IRAM_ATTR timer1ISR() {
+  callCount++;
+
+  if(callCount % 210 == 0){
+    onLED0();
+    callCount = 0; 
+  } else {
+    offLED0();
+  }
+}
 
 // Callback, wenn Daten empfangen werden
 void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
@@ -42,12 +63,60 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
     Serial.println(receivedStruct.data[i]);
   }
 
-  // Toggle LED0 based on the first element of the received data
-  if (receivedStruct.data[0]) {
-    onLED0();
-  } else {
-    offLED0();
+  // LED Matrix 210x210, recievedStruct.data[0] hat x und receivedStruct.data[1] hat y Koordinate
+
+  // 0 = 0b1000000000000000 = 0d32768
+  // 1 = 0b0100000000000000 = 0d16384
+  // 2 = 0b0010000000000000 = 0d8192
+  // 3 = 0b0001000000000000 = 0d4096
+  // 4 = 0b0000100000000000 = 0d2048
+  // 5 = 0b0000010000000000 = 0d1024
+  // 6 = 0b0000001000000000 = 0d512
+  // 7 = 0b0000000100000000 = 0d256
+  // 8 = 0b0000000010000000 = 0d128
+  // 9 = 0b0000000001000000 = 0d64
+  // 10 = 0b0000000000100000 = 0d32
+  // 11 = 0b0000000000010000 = 0d16
+  // 12 = 0b0000000000001000 = 0d8
+  // 13 = 0b0000000000000100 = 0d4
+  // 14 = 0b0000000000000010 = 0d2
+  // 15 = 0b0000000000000001 = 0d1
+  //Formel: reg_data = 0b0000000000000000 + (0b0000000000000001 << (16 - receivedStruct.data[1]));
+
+  test_data = 0b0000000000000001 << (16 - receivedStruct.data[0]);
+  Serial.print("Test data: ");
+  Serial.println(test_data, BIN);
+
+
+  if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 0) {
+    reg_data = 0b1000000000000000;
+    writeRegData();
   }
+
+  else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 1) {
+    reg_data = 0b0100000000000000; 
+    writeRegData();
+  }
+
+  else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 2) {
+    reg_data = 0b0010000000000000; 
+    writeRegData();
+  }
+  else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 3) {
+    reg_data = 0b0001000000000000; 
+    writeRegData();
+  }
+  else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 4) {
+    reg_data = 0b0000100000000000; 
+    writeRegData();
+  }
+  else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 5) {
+    reg_data = 0b0000010000000000; 
+    writeRegData();
+  }
+
+  
+    
 }
 
 // Callback, wenn Daten gesendet werden
@@ -62,6 +131,11 @@ void setup() {
   pinMode(DATA_PIN, OUTPUT);
   pinMode(CLOCK_PIN, OUTPUT);
   pinMode(LATCH_PIN, OUTPUT);
+
+  //timer1_isr_init();
+  //timer1_attachInterrupt(timer1ISR);
+  //timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP); //TIM_DIV16 = 5MHz
+  //timer1_write(2046);
 
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
@@ -87,13 +161,8 @@ void setup() {
 }
 
 void loop() {
-    // message
-    // esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
 
-    onLED0(); // Turn on LED0
-    delay(1000); // Wait for 1 second
-    offLED0(); // Turn off LED0
-    delay(1000); // Wait for 1 second
+
 
 }
 
@@ -113,16 +182,6 @@ void writeRegData() {
   digitalWrite(LATCH_PIN, LOW);  // Latch wieder deaktivieren
 }
 
-void toggleLED0() {
-  static bool ledState = false; // Static variable to hold the LED state
-  ledState = !ledState; // Toggle the state
-  if (ledState) {
-    onLED0(); // Turn on LED0
-  } else {
-    offLED0(); // Turn off LED0
-  }
-}
-
 void onLED0() {
   reg_data |= 0b0000000000000001; // Set the first bit to 1
   writeRegData();
@@ -130,5 +189,25 @@ void onLED0() {
 
 void offLED0() {
   reg_data &= ~0b0000000000000001; // Clear the first bit to 0
+  writeRegData();
+}
+
+void onLED1() {
+  reg_data |= 0b0000000000000010; // Set the second bit to 1
+  writeRegData();
+}
+
+void offLED1() {
+  reg_data &= ~0b0000000000000010; // Clear the second bit to 0
+  writeRegData();
+}
+
+void onLED15() {
+  reg_data |= 0b1000000000000000; // Set the 15th bit to 1
+  writeRegData();
+}
+
+void offLED15() {
+  reg_data &= ~0b1000000000000000; // Clear the 15th bit to 0
   writeRegData();
 }

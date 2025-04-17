@@ -1,19 +1,36 @@
 #include <ESP8266WiFi.h>
 #include <espnow.h>
+#include <OneButton.h>
 
-const int buttonPin = D2; // Pin, an dem der Button angeschlossen ist
-bool buttonState = HIGH;  // Aktueller Zustand des Buttons
-bool previousButtonState = HIGH; // Vorheriger Zustand des Buttons
+const int bUP = D0;
+const int bDOWN = D1;
+const int bLEFT = D2;
+const int bRIGHT = D3;
+const int bMIDDLE = D4;
+
+// Create OneButton instances for each button
+OneButton buttonUp(bUP, true);
+OneButton buttonDown(bDOWN, true);
+OneButton buttonLeft(bLEFT, true);
+OneButton buttonRight(bRIGHT, true);
+OneButton buttonMiddle(bMIDDLE, true);
 
 uint8_t broadcastAddress[] = { 0x08, 0x3A, 0x8D, 0xCD, 0x66, 0xAF };
 
-const int dataSize = 13;
+// Erstes Byte: x Koordinate, zweites Byte: y Koordinate, drittes Byte: buttons
+
+const int dataSize = 3;
 typedef struct struct_message {
-  bool data[dataSize];
+  byte data[dataSize];
 } struct_message;
 
 struct_message toSendStruct;
 struct_message receivedStruct;
+
+void SendToSphere() {
+  esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
+  Serial.println("x: " + String(toSendStruct.data[0]) + ", y: " + String(toSendStruct.data[1]));
+}
 
 // Callback, wenn Daten gesendet werden
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
@@ -36,7 +53,10 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
     Serial.print("Data[");
     Serial.print(i);
     Serial.print("]: ");
-    Serial.println(receivedStruct.data[i]);
+    for (int bit = 7; bit >= 0; bit--) {
+      Serial.print(bitRead(receivedStruct.data[i], bit));
+    }
+    Serial.println();
   }
 }
 
@@ -44,8 +64,54 @@ void setup() {
   // Init Serial Monitor
   Serial.begin(9600);
 
-  // Button-Pin als Eingang setzen
-  pinMode(buttonPin, INPUT_PULLUP);
+  // Init Buttons
+  buttonUp.attachClick([]() {
+    Serial.println("Button UP clicked");
+    if (toSendStruct.data[1] < 210) {
+      toSendStruct.data[1] += 1; // Example: Increment x coordinate
+    }
+    else {
+      toSendStruct.data[1] = 0; // Reset to 0 if it exceeds 210
+    }
+    SendToSphere();
+  });
+
+  buttonDown.attachClick([]() {
+    Serial.println("Button DOWN clicked");
+    if (toSendStruct.data[1] > 0) {
+      toSendStruct.data[1] -= 1; // Example: Decrement x coordinate
+    }
+    else {
+      toSendStruct.data[1] = 210; // Reset to 210 if it goes below 0
+    }
+    SendToSphere();
+  });
+
+  buttonLeft.attachClick([]() {
+    Serial.println("Button LEFT clicked");
+    if (toSendStruct.data[0] > 0) {
+      toSendStruct.data[0] -= 1; // Example: Decrement y coordinate
+    }
+    else {
+      toSendStruct.data[0] = 210; // Reset to 210 if it goes below 0
+    }
+    SendToSphere();
+  });
+
+  buttonRight.attachClick([]() {
+    Serial.println("Button RIGHT clicked");
+    if (toSendStruct.data[0] < 210) {
+      toSendStruct.data[0] += 1; // Example: Increment y coordinate
+    }
+    else {
+      toSendStruct.data[0] = 0; // Reset to 0 if it exceeds 210
+    }
+    SendToSphere();
+  });
+
+  buttonMiddle.attachClick([]() {
+    Serial.println("Button MIDDLE clicked");
+  });
 
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
@@ -71,23 +137,10 @@ void setup() {
 }
 
 void loop() {
-  // Button-Zustand einlesen
-  buttonState = digitalRead(buttonPin);
-
-  // Prüfen, ob sich der Zustand geändert hat
-  if (buttonState != previousButtonState) {
-    Serial.print("Button state changed to: ");
-    Serial.println(buttonState);
-
-    // Erste Stelle des Arrays mit dem Button-Zustand aktualisieren
-    toSendStruct.data[0] = (buttonState == LOW); // LOW bedeutet gedrückt
-
-    // Nachricht senden
-    esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
-
-    // Vorherigen Zustand aktualisieren
-    previousButtonState = buttonState;
-  }
-
-  delay(20); // Entprellung
+  // Continuously check button states
+  buttonUp.tick();
+  buttonDown.tick();
+  buttonLeft.tick();
+  buttonRight.tick();
+  buttonMiddle.tick();
 }
