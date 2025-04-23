@@ -9,13 +9,16 @@
 #define LATCH_PIN D7 // LE
 #define HALL_PIN D3 // Hall Sensor
 
+const int steps_per_rotation = 210; // Anzahl Schritte pro Umdrehung
+uint32_t timer_ticks_arr[10] = {2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024}; // Array to store timer ticks for each rotation
+
 const int dataSize = 3;
 typedef struct struct_message_to_sphere {
   byte data[dataSize];
 } struct_message_to_sphere;
 
 typedef struct struct_message_to_display {
-  int data[2];
+  unsigned long data[2];
 } struct_message_to_display;
 
 struct_message_to_sphere receivedStruct;
@@ -34,6 +37,12 @@ static unsigned long lastTime = 0; // Initialize lastTime to store the previous 
 bool ledMatrix[210][210] = {false}; // 2D Array to store LED states
 
 void writeRegData();
+void set_Matrix_easy_shape();
+void set_Matrix_test1();
+void set_Matrix_NSEW();
+void set_Matrix_letter_Z();
+void set_Matrix_letter_N();
+
 void toggleLED0();
 void onLED0();
 void offLED0();
@@ -48,24 +57,33 @@ volatile int callCount = 0; // Counter to track the number of calls
 void IRAM_ATTR timer1ISR() {
   callCount++;
 
-  switch (callCount % 210) {
-    case 0:
-      callCount = 0;
-      for (int i = 0; i < 16; i++) {
-        bitWrite(reg_blue[0], i, ledMatrix[0][i]);
-      }
-      break;
-
-    case 1:
-      for (int i = 0; i < 16; i++) {
-        bitWrite(reg_blue[0], i, ledMatrix[1][i]);
-      }
-      break;
-
-    default:
-      reg_blue[0] = 0b0000000000000000;
-      break;
+  if (callCount % 210 == 0) {
+    callCount = 0;
+    for (int i = 0; i < 16; i++) {
+      bitWrite(reg_blue[0], i, ledMatrix[0][i]);
+    }
   }
+
+  for (int j = 1; j < 210; j++) {
+    if (callCount % 210 == j) {
+      for (int i = 0; i < 16; i++) {
+        bitWrite(reg_blue[0], i, ledMatrix[j][i]);
+      }
+    }
+  }
+
+  /*if (callCount % 210 == 0) {
+    callCount = 0;
+    for (int i = 0; i < 16; i++) {
+      bitWrite(reg_blue[0], i, ledMatrix[0][i]);
+    }
+  } else if (callCount % 210 == 1) {
+    for (int i = 0; i < 16; i++) {
+      bitWrite(reg_blue[0], i, ledMatrix[1][i]);
+    }
+  } else {
+    reg_blue[0] = 0b0000000000000000;
+  }*/
 
 writeRegData();
 
@@ -165,14 +183,12 @@ void setup() {
   // 85 ms / 210 Schritte ≈ 0,40476 ms ≈ 404,76 µs pro Schritt
   // Timer-Ticks = 404,76 µs / 0,2 µs = 2023,8 Ticks ≈ 2024
 
-  ledMatrix[0][0] = true; // Set the first LED to ON
-  ledMatrix[0][2] = true; // Set the second LED to ON
-  ledMatrix[0][4] = true; // Set the third LED to ON
-  ledMatrix[0][6] = true; // Set the fourth LED to ON
-
-  ledMatrix[1][1] = true; // Set the first LED to ON
-  ledMatrix[1][3] = true; // Set the second LED to ON
-  ledMatrix[1][5] = true; // Set the third LED to ON
+  // Set Muster
+  set_Matrix_letter_N();
+  //set_Matrix_letter_Z();
+  //set_Matrix_easy_shape();
+  //set_Matrix_test1();
+  //set_Matrix_NSEW();
 
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
@@ -183,52 +199,78 @@ void setup() {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
-
-  // Set ESP-NOW Role
-  esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
-
-  // Register Send Callback
-  esp_now_register_send_cb(OnDataSent);
-
-  // Register Receive Callback
-  esp_now_register_recv_cb(OnDataRecv);
-
-  // Register peer
-  esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
+  esp_now_set_self_role(ESP_NOW_ROLE_COMBO); // Set ESP-NOW Role
+  esp_now_register_send_cb(OnDataSent); // Register Send Callback
+  esp_now_register_recv_cb(OnDataRecv); // Register Receive Callback
+  esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_COMBO, 1, NULL, 0); // Register peer
 }
 
 void loop() {
-
-  // Hall Sensor auslesen
+  // Hall Sensor auslesen und an display esp schicken
   int hallValue = digitalRead(HALL_PIN);
   // messe Umdrehungszeit
   static bool lastHallState = HIGH; // Speichert den vorherigen Zustand des Hall-Sensors
 
   if (lastHallState == HIGH && hallValue == LOW) {
     // Trigger auf fallende Flanke
-    unsigned long currentTime = millis();
+    unsigned long currentTime = micros(); // Aktuelle Zeit in Millisekunden
     unsigned long elapsedTime = currentTime - lastTime;
     lastTime = currentTime; // Update last time
 
-    Serial.print("Elapsed time: ");
-    Serial.print(elapsedTime);
-    Serial.println(" ms");
+    unsigned long new_timer_ticks = (elapsedTime * 5) / steps_per_rotation;
+    Serial.print("New timer ticks: ");
+    Serial.println(new_timer_ticks);
 
-    // Berechne die Umdrehungszahl
-    float rpm = (1000.0 / elapsedTime) * 60.0; // Umdrehungen pro Minute
-    Serial.print("RPM: ");
-    Serial.println(rpm);
+    /*if ((new_timer_ticks < average_timer_ticks + 500) && (new_timer_ticks > average_timer_ticks - 500)) {
+      // new_timer_ticks in array, alle eins nach hinten, neuer Wert an index 0
+      for (int i = 9; i > 0; i--) {
+        timer_ticks_arr[i] = timer_ticks_arr[i - 1];
+      }
+      timer_ticks_arr[0] = new_timer_ticks;
+    }*/
+
+    // new_timer_ticks in array, alle eins nach hinten, neuer Wert an index 0
+    for (int i = 9; i > 0; i--) {
+      timer_ticks_arr[i] = timer_ticks_arr[i - 1];
+    }
+    timer_ticks_arr[0] = new_timer_ticks;
+
+    // average timer_ticks_arr
+    unsigned long average_timer_ticks = 0;
+    for (int i = 0; i < 10; i++) {
+      average_timer_ticks += timer_ticks_arr[i];
+    }
+    average_timer_ticks /= 10;
+
+    //timer1_write(new_timer_ticks); // Timer neu setzen
+
+    Serial.print("timer_ticks_arr: ");
+      for (int i = 0; i < 10; i++) {
+        Serial.print(timer_ticks_arr[i]);
+        Serial.print(", ");
+      }
+    
+
+    /*Serial.print("Elapsed time: ");
+    Serial.print(elapsedTime);
+    Serial.print(" µs, ");
+    Serial.print(elapsedTime / 1000.0);
+    Serial.println(" ms, ");
+
+    Serial.print("Timer ticks: ");
+    Serial.println(new_timer_ticks);*/
 
     // Sende Umdrehungszeit und Geschwindigkeit an den anderen ESP
     toSendStruct.data[0] = elapsedTime;
-    toSendStruct.data[1] = int(rpm); // Konvertiere float zu int
+    toSendStruct.data[1] = new_timer_ticks;
 
     esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
+    
   }
 
   lastHallState = hallValue; // Speichere den aktuellen Zustand
+  
 }
-
 
 // sendet 16 Bit an das Register
 void writeRegData() {
@@ -252,6 +294,86 @@ void writeRegData() {
   delayMicroseconds(10);
   digitalWrite(LATCH_PIN, LOW);  // Latch wieder deaktivieren
 }
+
+void set_Matrix_easy_shape() {
+  ledMatrix[0][0] = true; // Set the first LED to ON
+  ledMatrix[0][2] = true; // Set the second LED to ON
+  ledMatrix[0][4] = true; // Set the third LED to ON
+  ledMatrix[0][6] = true; // Set the fourth LED to ON
+  ledMatrix[0][8] = true; // Set the fifth LED to ON
+  ledMatrix[0][10] = true; // Set the sixth LED to ON
+  ledMatrix[0][12] = true; // Set the seventh LED to ON
+  ledMatrix[0][14] = true; // Set the eighth LED to ON
+
+  ledMatrix[1][1] = true; // Set the first LED to ON
+  ledMatrix[1][3] = true; // Set the second LED to ON
+  ledMatrix[1][5] = true; // Set the third LED to ON
+  ledMatrix[1][7] = true; // Set the fourth LED to ON
+  ledMatrix[1][9] = true; // Set the fifth LED to ON
+  ledMatrix[1][11] = true; // Set the sixth LED to ON
+  ledMatrix[1][13] = true; // Set the seventh LED to ON
+  ledMatrix[1][15] = true; // Set the eighth LED to ON
+}
+
+void set_Matrix_test1() {
+  // Nur die ersten 16 leds sind angeschlossen
+  for (int row = 0; row < 210; row += 8) {
+    for (int i = 0; i < 16; i++) {
+      ledMatrix[row][i] = true; // Set all LEDs in the row to ON
+    }
+  }
+}
+
+void set_Matrix_NSEW() { // North South East West
+  int rows_to_be_set[] = {0, 52, 104, 156}; // Set the rows to be set to ON	
+  for (int i = 0; i < sizeof(rows_to_be_set) / sizeof(rows_to_be_set[0]); i++) {
+    int row = rows_to_be_set[i];
+    for (int j = 0; j < 16; j++) {
+      ledMatrix[row][j] = true; // Set all LEDs in the row to ON
+    }
+  }  
+}
+
+void set_Matrix_letter_Z() {
+  // Set the first column to ON
+  for (int i = 0; i < 16; i++) {
+    ledMatrix[i][0] = true; // Set the first LED to ON
+  }
+
+  // Set the diagonal from top left to bottom right to ON
+  for (int i = 0; i < 16; i++) {
+    ledMatrix[i][i] = true; // Set the diagonal LED to ON
+  }
+
+  // Set the last column to ON
+  for (int i = 0; i < 16; i++) {
+    ledMatrix[i][15] = true; // Set the last LED to ON
+  }
+}
+
+void set_Matrix_letter_N() {
+  // Set the first column to ON
+  for (int i = 0; i < 16; i++) {
+    // Set the first column to ON
+    ledMatrix[0][i] = true; // Set the first LED to ON
+    
+    // Set the last column to ON
+    ledMatrix[15][i] = true; // Set the last LED to ON
+  }
+
+  // Set the diagonal from top left to bottom right to ON
+  for (int i = 16; i >=0; i--) {
+    ledMatrix[16-i][i] = true; // Set the diagonal LED to ON
+  }
+
+  // Set the last column to ON
+  for (int i = 0; i < 16; i++) {
+    ledMatrix[15][i] = true; // Set the last LED to ON
+  }
+}
+
+
+
 
 void onLED0() {
   reg_blue[0] |= 0b0000000000000001; // Set the first bit to 1

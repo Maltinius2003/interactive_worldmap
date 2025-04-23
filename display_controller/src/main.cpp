@@ -25,7 +25,7 @@ typedef struct struct_message_to_sphere {
 } struct_message_to_sphere;
 
 typedef struct struct_message_to_display {
-  int data[2];
+  unsigned long data[2];
 } struct_message_to_display;
 
 struct_message_to_sphere toSendStruct;
@@ -44,18 +44,21 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
 
 // Callback, wenn Daten empfangen werden
 void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
-  Serial.print("Received packet from: ");
+  /*Serial.print("Received packet from: ");
   for (int i = 0; i < 6; i++) {
     Serial.print(mac_addr[i], HEX);
     if (i < 5) Serial.print(":");
   }
-  Serial.println();
+  Serial.println();*/
 
   memcpy(&receivedStruct, incomingData, sizeof(receivedStruct));
-  Serial.println("Received data:");
+  //Serial.println("Received data:");
   Serial.print("Umdrehungszeit: ");
-  Serial.println(receivedStruct.data[0]); // Erste Stelle: Umdrehungszeit
-  Serial.print("Umdrehungsgeschwindigkeit: ");
+  Serial.print(receivedStruct.data[0]); // Erste Stelle: Umdrehungszeit
+  Serial.print(" µs, ");
+  Serial.print(receivedStruct.data[0] / 1000); // Umrechnung in Millisekunden
+  Serial.print(" ms");
+  Serial.print("Timer Ticks: ");
   Serial.println(receivedStruct.data[1]); // Zweite Stelle: Umdrehungsgeschwindigkeit
 }
 
