@@ -10,13 +10,16 @@
 #define HALL_PIN D3 // Hall Sensor
 
 const int dataSize = 3;
-
-typedef struct struct_message {
+typedef struct struct_message_to_sphere {
   byte data[dataSize];
-} struct_message;
+} struct_message_to_sphere;
 
-struct_message receivedStruct;
-struct_message toSendStruct;
+typedef struct struct_message_to_display {
+  int data[2];
+} struct_message_to_display;
+
+struct_message_to_sphere receivedStruct;
+struct_message_to_display toSendStruct;
 
 uint8_t broadcastAddress[] = { 0x44, 0x17, 0x93, 0x1B, 0xB0, 0x6F };
 
@@ -24,6 +27,9 @@ uint16_t reg_data = 0b0000000000000000; // Registerdaten
 uint16_t test_data = 0b0000000000000000; // Testdaten
 
 static unsigned long lastTime = 0; // Initialize lastTime to store the previous timestamp (hall sensor)
+
+// 210 x 210 LED Matrix
+bool ledMatrix[210][210] = {false}; // 2D Array to store LED states
 
 void writeRegData();
 void toggleLED0();
@@ -40,13 +46,29 @@ volatile int callCount = 0; // Counter to track the number of calls
 void IRAM_ATTR timer1ISR() {
   callCount++;
 
-  if(callCount % 210 == 0){
-    onLED0();
-    callCount = 0; 
-  } else {
-    offLED0();
+  switch (callCount % 210) {
+    case 0:
+      callCount = 0;
+      for (int i = 0; i < 7; i++) {
+        bitWrite(reg_data, i, ledMatrix[0][i]);
+      }
+      break;
+
+    case 1:
+      for (int i = 0; i < 7; i++) {
+        bitWrite(reg_data, i, ledMatrix[1][i]);
+      }
+      break;
+
+    default:
+      reg_data = 0b0000000000000000;
+      break;
   }
+
+writeRegData();
+
 }
+
 
 // Callback, wenn Daten empfangen werden
 void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
@@ -134,10 +156,21 @@ void setup() {
   pinMode(LATCH_PIN, OUTPUT);
   pinMode(HALL_PIN, INPUT);
 
-  //timer1_isr_init();
-  //timer1_attachInterrupt(timer1ISR);
-  //timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP); //TIM_DIV16 = 5MHz
-  //timer1_write(2046);
+  timer1_isr_init();
+  timer1_attachInterrupt(timer1ISR);
+  timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP); //TIM_DIV16 = 5MHz
+  timer1_write(2024); 
+  // 85 ms / 210 Schritte ≈ 0,40476 ms ≈ 404,76 µs pro Schritt
+  // Timer-Ticks = 404,76 µs / 0,2 µs = 2023,8 Ticks ≈ 2024
+
+  ledMatrix[0][0] = true; // Set the first LED to ON
+  ledMatrix[0][2] = true; // Set the second LED to ON
+  ledMatrix[0][4] = true; // Set the third LED to ON
+  ledMatrix[0][6] = true; // Set the fourth LED to ON
+
+  ledMatrix[1][1] = true; // Set the first LED to ON
+  ledMatrix[1][3] = true; // Set the second LED to ON
+  ledMatrix[1][5] = true; // Set the third LED to ON
 
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
@@ -165,7 +198,6 @@ void setup() {
 void loop() {
 
   // Hall Sensor auslesen
-  
   int hallValue = digitalRead(HALL_PIN);
   // messe Umdrehungszeit
   static bool lastHallState = HIGH; // Speichert den vorherigen Zustand des Hall-Sensors
@@ -184,11 +216,15 @@ void loop() {
     float rpm = (1000.0 / elapsedTime) * 60.0; // Umdrehungen pro Minute
     Serial.print("RPM: ");
     Serial.println(rpm);
+
+    // Sende Umdrehungszeit und Geschwindigkeit an den anderen ESP
+    toSendStruct.data[0] = elapsedTime;
+    toSendStruct.data[1] = int(rpm); // Konvertiere float zu int
+
+    esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
   }
 
   lastHallState = hallValue; // Speichere den aktuellen Zustand
-
-
 }
 
 

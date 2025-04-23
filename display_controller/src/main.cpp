@@ -20,12 +20,16 @@ uint8_t broadcastAddress[] = { 0x08, 0x3A, 0x8D, 0xCD, 0x66, 0xAF };
 // Erstes Byte: x Koordinate, zweites Byte: y Koordinate, drittes Byte: buttons
 
 const int dataSize = 3;
-typedef struct struct_message {
+typedef struct struct_message_to_sphere {
   byte data[dataSize];
-} struct_message;
+} struct_message_to_sphere;
 
-struct_message toSendStruct;
-struct_message receivedStruct;
+typedef struct struct_message_to_display {
+  int data[2];
+} struct_message_to_display;
+
+struct_message_to_sphere toSendStruct;
+struct_message_to_display receivedStruct;
 
 void SendToSphere() {
   esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
@@ -49,15 +53,10 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
 
   memcpy(&receivedStruct, incomingData, sizeof(receivedStruct));
   Serial.println("Received data:");
-  for (int i = 0; i < dataSize; i++) {
-    Serial.print("Data[");
-    Serial.print(i);
-    Serial.print("]: ");
-    for (int bit = 7; bit >= 0; bit--) {
-      Serial.print(bitRead(receivedStruct.data[i], bit));
-    }
-    Serial.println();
-  }
+  Serial.print("Umdrehungszeit: ");
+  Serial.println(receivedStruct.data[0]); // Erste Stelle: Umdrehungszeit
+  Serial.print("Umdrehungsgeschwindigkeit: ");
+  Serial.println(receivedStruct.data[1]); // Zweite Stelle: Umdrehungsgeschwindigkeit
 }
 
 void setup() {
