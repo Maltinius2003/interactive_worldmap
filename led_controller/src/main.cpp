@@ -23,7 +23,9 @@ struct_message_to_display toSendStruct;
 
 uint8_t broadcastAddress[] = { 0x44, 0x17, 0x93, 0x1B, 0xB0, 0x6F };
 
-uint16_t reg_data = 0b0000000000000000; // Registerdaten
+uint16_t reg_blue[13] = {0b0000000000000000}; // Registerdaten
+uint16_t reg_red[13] = {0b0000000000000000}; // Registerdaten
+
 uint16_t test_data = 0b0000000000000000; // Testdaten
 
 static unsigned long lastTime = 0; // Initialize lastTime to store the previous timestamp (hall sensor)
@@ -49,19 +51,19 @@ void IRAM_ATTR timer1ISR() {
   switch (callCount % 210) {
     case 0:
       callCount = 0;
-      for (int i = 0; i < 7; i++) {
-        bitWrite(reg_data, i, ledMatrix[0][i]);
+      for (int i = 0; i < 16; i++) {
+        bitWrite(reg_blue[0], i, ledMatrix[0][i]);
       }
       break;
 
     case 1:
-      for (int i = 0; i < 7; i++) {
-        bitWrite(reg_data, i, ledMatrix[1][i]);
+      for (int i = 0; i < 16; i++) {
+        bitWrite(reg_blue[0], i, ledMatrix[1][i]);
       }
       break;
 
     default:
-      reg_data = 0b0000000000000000;
+      reg_blue[0] = 0b0000000000000000;
       break;
   }
 
@@ -106,7 +108,7 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
   // 13 = 0b0000000000000100 = 0d4
   // 14 = 0b0000000000000010 = 0d2
   // 15 = 0b0000000000000001 = 0d1
-  //Formel: reg_data = 0b0000000000000000 + (0b0000000000000001 << (16 - receivedStruct.data[1]));
+  //Formel: reg_blue[0] = 0b0000000000000000 + (0b0000000000000001 << (16 - receivedStruct.data[1]));
 
   test_data = 0b0000000000000001 << (16 - receivedStruct.data[0]);
   Serial.print("Test data: ");
@@ -114,29 +116,29 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
 
 
   if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 0) {
-    reg_data = 0b1000000000000000;
+    reg_blue[0] = 0b1000000000000000;
     writeRegData();
   }
 
   else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 1) {
-    reg_data = 0b0100000000000000; 
+    reg_blue[0] = 0b0100000000000000; 
     writeRegData();
   }
 
   else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 2) {
-    reg_data = 0b0010000000000000; 
+    reg_blue[0] = 0b0010000000000000; 
     writeRegData();
   }
   else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 3) {
-    reg_data = 0b0001000000000000; 
+    reg_blue[0] = 0b0001000000000000; 
     writeRegData();
   }
   else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 4) {
-    reg_data = 0b0000100000000000; 
+    reg_blue[0] = 0b0000100000000000; 
     writeRegData();
   }
   else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 5) {
-    reg_data = 0b0000010000000000; 
+    reg_blue[0] = 0b0000010000000000; 
     writeRegData();
   }
 
@@ -232,9 +234,17 @@ void loop() {
 void writeRegData() {
   digitalWrite(LATCH_PIN, LOW); // Latch deaktivieren
 
-  for (int i = 15; i >= 0; i--) {
+  /*for (int i = 12; i >= 0; i--) {
+    for (int j = 0; j < 16; j++) {
+      digitalWrite(CLOCK_PIN, LOW); // Clock low
+      digitalWrite(DATA_PIN, (reg_blue[i] >> j) & 0x01); // Bit setzen
+      digitalWrite(CLOCK_PIN, HIGH); // Bit übernehmen
+    }
+  }*/
+  
+  for (int j = 0; j < 16; j++) {
     digitalWrite(CLOCK_PIN, LOW); // Clock low
-    digitalWrite(DATA_PIN, (reg_data >> i) & 0x01); // Bit setzen
+    digitalWrite(DATA_PIN, (reg_blue[0] >> j) & 0x01); // Bit setzen
     digitalWrite(CLOCK_PIN, HIGH); // Bit übernehmen
   }
 
@@ -244,31 +254,31 @@ void writeRegData() {
 }
 
 void onLED0() {
-  reg_data |= 0b0000000000000001; // Set the first bit to 1
+  reg_blue[0] |= 0b0000000000000001; // Set the first bit to 1
   writeRegData();
 }
 
 void offLED0() {
-  reg_data &= ~0b0000000000000001; // Clear the first bit to 0
+  reg_blue[0] &= ~0b0000000000000001; // Clear the first bit to 0
   writeRegData();
 }
 
 void onLED1() {
-  reg_data |= 0b0000000000000010; // Set the second bit to 1
+  reg_blue[0] |= 0b0000000000000010; // Set the second bit to 1
   writeRegData();
 }
 
 void offLED1() {
-  reg_data &= ~0b0000000000000010; // Clear the second bit to 0
+  reg_blue[0] &= ~0b0000000000000010; // Clear the second bit to 0
   writeRegData();
 }
 
 void onLED15() {
-  reg_data |= 0b1000000000000000; // Set the 15th bit to 1
+  reg_blue[0] |= 0b1000000000000000; // Set the 15th bit to 1
   writeRegData();
 }
 
 void offLED15() {
-  reg_data &= ~0b1000000000000000; // Clear the 15th bit to 0
+  reg_blue[0] &= ~0b1000000000000000; // Clear the 15th bit to 0
   writeRegData();
 }
