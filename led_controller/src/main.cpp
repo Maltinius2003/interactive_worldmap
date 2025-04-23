@@ -7,6 +7,7 @@
 #define DATA_PIN D5  // SDI
 #define CLOCK_PIN D6 // CLK
 #define LATCH_PIN D7 // LE
+#define HALL_PIN D3 // Hall Sensor
 
 const int dataSize = 3;
 
@@ -21,6 +22,8 @@ uint8_t broadcastAddress[] = { 0x44, 0x17, 0x93, 0x1B, 0xB0, 0x6F };
 
 uint16_t reg_data = 0b0000000000000000; // Registerdaten
 uint16_t test_data = 0b0000000000000000; // Testdaten
+
+static unsigned long lastTime = 0; // Initialize lastTime to store the previous timestamp (hall sensor)
 
 void writeRegData();
 void toggleLED0();
@@ -115,8 +118,6 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
     writeRegData();
   }
 
-  
-    
 }
 
 // Callback, wenn Daten gesendet werden
@@ -131,6 +132,7 @@ void setup() {
   pinMode(DATA_PIN, OUTPUT);
   pinMode(CLOCK_PIN, OUTPUT);
   pinMode(LATCH_PIN, OUTPUT);
+  pinMode(HALL_PIN, INPUT);
 
   //timer1_isr_init();
   //timer1_attachInterrupt(timer1ISR);
@@ -162,6 +164,29 @@ void setup() {
 
 void loop() {
 
+  // Hall Sensor auslesen
+  
+  int hallValue = digitalRead(HALL_PIN);
+  // messe Umdrehungszeit
+  static bool lastHallState = HIGH; // Speichert den vorherigen Zustand des Hall-Sensors
+
+  if (lastHallState == HIGH && hallValue == LOW) {
+    // Trigger auf fallende Flanke
+    unsigned long currentTime = millis();
+    unsigned long elapsedTime = currentTime - lastTime;
+    lastTime = currentTime; // Update last time
+
+    Serial.print("Elapsed time: ");
+    Serial.print(elapsedTime);
+    Serial.println(" ms");
+
+    // Berechne die Umdrehungszahl
+    float rpm = (1000.0 / elapsedTime) * 60.0; // Umdrehungen pro Minute
+    Serial.print("RPM: ");
+    Serial.println(rpm);
+  }
+
+  lastHallState = hallValue; // Speichere den aktuellen Zustand
 
 
 }
