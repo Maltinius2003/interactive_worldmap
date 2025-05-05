@@ -31,8 +31,6 @@ uint16_t reg_red[13] = {0b0000000000000000}; // Registerdaten
 
 uint16_t test_data = 0b0000000000000000; // Testdaten
 
-static unsigned long lastTime = 0; // Initialize lastTime to store the previous timestamp (hall sensor)
-
 // 210 x 210 LED Matrix
 bool ledMatrix[210][210] = {false}; // 2D Array to store LED states
 
@@ -54,9 +52,13 @@ void offLED15();
 volatile bool toggle = false;
 volatile int callCount = 0; // Counter to track the number of calls
 
-// Hall Sensor Entprellung
+// Hall Sensor
 volatile unsigned long lastTriggerTime = 0;
 volatile unsigned long rotationTime_us = 0;
+volatile bool newRotationDetected = false;
+
+
+volatile int tick_index = 0; // Index for circular array
 
 void IRAM_ATTR timer1ISR() {
   callCount++;
@@ -93,11 +95,14 @@ writeRegData();
 
 }
 
+
+// Interrupt-Service-Routine für den Hall-Sensor
 void IRAM_ATTR hallISR() {
   unsigned long now = micros();
-  if (now - lastTriggerTime > 100000) {  // >100ms Entprellzeit
+  if (now - lastTriggerTime > 10000) {  // Entprellen
     rotationTime_us = now - lastTriggerTime;
     lastTriggerTime = now;
+    newRotationDetected = true;
   }
 }
 
@@ -193,7 +198,8 @@ void setup() {
   timer1_isr_init();
   timer1_attachInterrupt(timer1ISR);
   timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP); //TIM_DIV16 = 5MHz
-  timer1_write(2024); 
+  timer1_write(2024);
+
   // 85 ms / 210 Schritte ≈ 0,40476 ms ≈ 404,76 µs pro Schritt
   // Timer-Ticks = 404,76 µs / 0,2 µs = 2023,8 Ticks ≈ 2024
 
@@ -220,17 +226,25 @@ void setup() {
 }
 
 void loop() {
-  static unsigned long lastSendTime = 0;
-  if (millis() - lastSendTime > 500) {  // alle 500 ms senden
-    lastSendTime = millis();
-
-    // Sicheren Zugriff auf Interrupt-Variable
+  if (newRotationDetected) {
     noInterrupts();
     unsigned long rotTime_us = rotationTime_us;
+    newRotationDetected = false;
     interrupts();
 
     if (rotTime_us > 0) {
-      float rpm = 60.0 * 1000000.0 / rotTime_us;
+      unsigned long timerTicks = (rotTime_us * 5) / steps_per_rotation;
+
+      // In Array speichern (zirkulär)
+      timer_ticks_arr[tick_index] = timerTicks;
+      tick_index = (tick_index + 1) % 10;
+
+      // Mittelwert berechnen
+      uint32_t sum = 0;
+      for (int i = 0; i < 10; i++) {
+        sum += timer_ticks_arr[i];
+      }
+      uint32_t averageTicks = sum / 10;
 
       // Debug-Ausgabe
       Serial.print("Umdrehungszeit: ");
@@ -238,17 +252,19 @@ void loop() {
       Serial.print(" µs, ");
       Serial.print(rotTime_us / 1000);
       Serial.print(" ms, ");
-      Serial.print("RPM: ");
-      Serial.println(rpm);
+      Serial.print("Timer-Ticks: ");
+      Serial.print(timerTicks);
+      Serial.print(" → Mittelwert: ");
+      Serial.println(averageTicks);
 
-      // Timer-Ticks berechnen (210 Schritte pro Umdrehung, 0.2 µs pro Tick)
-      unsigned long timerTicks = (rotTime_us * 5) / 210;
+      // Timer setzen mit Mittelwert
+      timer1_write(averageTicks);
 
-      // Datenstruktur füllen und senden
-      receivedStruct.data[0] = rotTime_us;
-      receivedStruct.data[1] = timerTicks;
+      // Datenstruktur für Versand
+      toSendStruct.data[0] = rotTime_us;
+      toSendStruct.data[1] = averageTicks;
 
-      esp_now_send(broadcastAddress, (uint8_t *)&receivedStruct, sizeof(receivedStruct));
+      esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
     }
   }
 }

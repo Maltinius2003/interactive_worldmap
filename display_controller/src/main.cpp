@@ -52,14 +52,16 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
   Serial.println();*/
 
   memcpy(&receivedStruct, incomingData, sizeof(receivedStruct));
-  //Serial.println("Received data:");
+  unsigned long rotTime_us = receivedStruct.data[0];
+  unsigned long timerTicks = receivedStruct.data[1];
+
   Serial.print("Umdrehungszeit: ");
-  Serial.print(receivedStruct.data[0]); // Erste Stelle: Umdrehungszeit
+  Serial.print(rotTime_us);
   Serial.print(" µs, ");
-  Serial.print(receivedStruct.data[0] / 1000); // Umrechnung in Millisekunden
-  Serial.print(" ms");
-  Serial.print("Timer Ticks: ");
-  Serial.println(receivedStruct.data[1]); // Zweite Stelle: Umdrehungsgeschwindigkeit
+  Serial.print(rotTime_us / 1000);
+  Serial.print(" ms, ");
+  Serial.print("Timer-Ticks: ");
+  Serial.println(timerTicks);
 }
 
 void setup() {
