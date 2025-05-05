@@ -7,7 +7,7 @@
 #define DATA_PIN D5  // SDI
 #define CLOCK_PIN D6 // CLK
 #define LATCH_PIN D7 // LE
-#define HALL_PIN D3 // Hall Sensor
+#define HALL_PIN D1 // Hall Sensor
 
 const int steps_per_rotation = 210; // Anzahl Schritte pro Umdrehung
 uint32_t timer_ticks_arr[10] = {2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024}; // Array to store timer ticks for each rotation
@@ -54,6 +54,10 @@ void offLED15();
 volatile bool toggle = false;
 volatile int callCount = 0; // Counter to track the number of calls
 
+// Hall Sensor Entprellung
+volatile unsigned long lastTriggerTime = 0;
+volatile unsigned long rotationTime_us = 0;
+
 void IRAM_ATTR timer1ISR() {
   callCount++;
 
@@ -89,6 +93,13 @@ writeRegData();
 
 }
 
+void IRAM_ATTR hallISR() {
+  unsigned long now = micros();
+  if (now - lastTriggerTime > 100000) {  // >100ms Entprellzeit
+    rotationTime_us = now - lastTriggerTime;
+    lastTriggerTime = now;
+  }
+}
 
 // Callback, wenn Daten empfangen werden
 void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
@@ -176,6 +187,9 @@ void setup() {
   pinMode(LATCH_PIN, OUTPUT);
   pinMode(HALL_PIN, INPUT);
 
+  // Interrupt bei FALLENDER Flanke auslösen
+  attachInterrupt(digitalPinToInterrupt(HALL_PIN), hallISR, FALLING);
+
   timer1_isr_init();
   timer1_attachInterrupt(timer1ISR);
   timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP); //TIM_DIV16 = 5MHz
@@ -206,70 +220,37 @@ void setup() {
 }
 
 void loop() {
-  // Hall Sensor auslesen und an display esp schicken
-  int hallValue = digitalRead(HALL_PIN);
-  // messe Umdrehungszeit
-  static bool lastHallState = HIGH; // Speichert den vorherigen Zustand des Hall-Sensors
+  static unsigned long lastSendTime = 0;
+  if (millis() - lastSendTime > 500) {  // alle 500 ms senden
+    lastSendTime = millis();
 
-  if (lastHallState == HIGH && hallValue == LOW) {
-    // Trigger auf fallende Flanke
-    unsigned long currentTime = micros(); // Aktuelle Zeit in Millisekunden
-    unsigned long elapsedTime = currentTime - lastTime;
-    lastTime = currentTime; // Update last time
+    // Sicheren Zugriff auf Interrupt-Variable
+    noInterrupts();
+    unsigned long rotTime_us = rotationTime_us;
+    interrupts();
 
-    unsigned long new_timer_ticks = (elapsedTime * 5) / steps_per_rotation;
-    Serial.print("New timer ticks: ");
-    Serial.println(new_timer_ticks);
+    if (rotTime_us > 0) {
+      float rpm = 60.0 * 1000000.0 / rotTime_us;
 
-    /*if ((new_timer_ticks < average_timer_ticks + 500) && (new_timer_ticks > average_timer_ticks - 500)) {
-      // new_timer_ticks in array, alle eins nach hinten, neuer Wert an index 0
-      for (int i = 9; i > 0; i--) {
-        timer_ticks_arr[i] = timer_ticks_arr[i - 1];
-      }
-      timer_ticks_arr[0] = new_timer_ticks;
-    }*/
+      // Debug-Ausgabe
+      Serial.print("Umdrehungszeit: ");
+      Serial.print(rotTime_us);
+      Serial.print(" µs, ");
+      Serial.print(rotTime_us / 1000);
+      Serial.print(" ms, ");
+      Serial.print("RPM: ");
+      Serial.println(rpm);
 
-    // new_timer_ticks in array, alle eins nach hinten, neuer Wert an index 0
-    for (int i = 9; i > 0; i--) {
-      timer_ticks_arr[i] = timer_ticks_arr[i - 1];
+      // Timer-Ticks berechnen (210 Schritte pro Umdrehung, 0.2 µs pro Tick)
+      unsigned long timerTicks = (rotTime_us * 5) / 210;
+
+      // Datenstruktur füllen und senden
+      receivedStruct.data[0] = rotTime_us;
+      receivedStruct.data[1] = timerTicks;
+
+      esp_now_send(broadcastAddress, (uint8_t *)&receivedStruct, sizeof(receivedStruct));
     }
-    timer_ticks_arr[0] = new_timer_ticks;
-
-    // average timer_ticks_arr
-    unsigned long average_timer_ticks = 0;
-    for (int i = 0; i < 10; i++) {
-      average_timer_ticks += timer_ticks_arr[i];
-    }
-    average_timer_ticks /= 10;
-
-    //timer1_write(new_timer_ticks); // Timer neu setzen
-
-    Serial.print("timer_ticks_arr: ");
-      for (int i = 0; i < 10; i++) {
-        Serial.print(timer_ticks_arr[i]);
-        Serial.print(", ");
-      }
-    
-
-    /*Serial.print("Elapsed time: ");
-    Serial.print(elapsedTime);
-    Serial.print(" µs, ");
-    Serial.print(elapsedTime / 1000.0);
-    Serial.println(" ms, ");
-
-    Serial.print("Timer ticks: ");
-    Serial.println(new_timer_ticks);*/
-
-    // Sende Umdrehungszeit und Geschwindigkeit an den anderen ESP
-    toSendStruct.data[0] = elapsedTime;
-    toSendStruct.data[1] = new_timer_ticks;
-
-    esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
-    
   }
-
-  lastHallState = hallValue; // Speichere den aktuellen Zustand
-  
 }
 
 // sendet 16 Bit an das Register
