@@ -57,7 +57,6 @@ volatile unsigned long lastTriggerTime = 0;
 volatile unsigned long rotationTime_us = 0;
 volatile bool newRotationDetected = false;
 
-
 volatile int tick_index = 0; // Index for circular array
 
 void IRAM_ATTR timer1ISR() {
