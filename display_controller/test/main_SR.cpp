@@ -3,27 +3,21 @@
 #include <Wire.h>
 #include <vector>
 
-// Wireless
-#include <ESP8266WiFi.h>
-#include <ESP8266WiFi.h>
-#include <espnow.h>
-
 // Buttons
 #define bA D6
 #define bB D7
 #define bSTART D5
+
 #define bUP D3
 #define bDOWN D4
 #define bLEFT D0
-//#define bRIGHT D
 
-typedef struct struct_message_to_sphere {
-  byte data[3];
-} struct_message_to_sphere;
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-typedef struct struct_message_to_display {
-  unsigned long data[2];
-} struct_message_to_display;
+int menu_layer = 1;
+int menu_layer_new = 0;
+
+int correct_countries = 0;
 
 /*const char* country_names[] = {
   "Deutschland", "Frankreich", "Italien", "Spanien", "Grossbritannien",
@@ -33,65 +27,32 @@ typedef struct struct_message_to_display {
   "Ukraine", "Kasachstan", "Iran", "Mongolei", "Daenemark", "Tuerkei"
 };*/
 
-struct_message_to_sphere toSendStruct;
-struct_message_to_display receivedStruct;
-
-std::vector<int> playable_countries;
-std::vector<int> selected_countries;
-
-// Wireless
-uint8_t broadcastAddress[] = { 0x08, 0x3A, 0x8D, 0xCD, 0x66, 0xAF };
-
 const char* country_names[] = {
   "Deutschland", "Frankreich", "Italien", "Spanien", "Grossbritannien",
   "Russland", "Schweden", "Kanada", "USA", "Australien"
 };
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+std::vector<int> playable_countries;
+std::vector<int> selected_countries;
 
-// Menu
-int menu_layer = 1;
-int menu_layer_new = 0;
-
-// Spiel
-int correct_countries = 0;
 int rand_country = 0;
 int player_country = 0;
 int played_rounds = 0;
 
-// Menu + Spiel
 void check_buttons();
 bool check_country(int country);
-void SendToSphere();
-void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus);
-void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len);
 
 void setup() {
   Serial.begin(9600); // Initialize Serial Monitor
-  lcd.init(); // Initialize LCD screen
+
+  // Initialize LCD screen
+  lcd.init();
   lcd.backlight();
+
   lcd.clear();
 
   pinMode(bA, INPUT); // Button A
   pinMode(bB, INPUT); // Button B
-  pinMode(bSTART, INPUT); // Button START
-  pinMode(bUP, INPUT); // Button UP
-  pinMode(bDOWN, INPUT); // Button DOWN
-  pinMode(bLEFT, INPUT); // Button LEFT
-  //pinMode(bRIGHT, INPUT); // Button RIGHT
-
-  WiFi.mode(WIFI_STA); // Wireless
-  WiFi.disconnect();
-
-  if (esp_now_init() != 0) { // Init ESP-NOW
-    Serial.println("Error initializing ESP-NOW");
-    return;
-  }
-
-  esp_now_set_self_role(ESP_NOW_ROLE_COMBO); // Set ESP-NOW Role
-  esp_now_register_send_cb(OnDataSent); // Register Send Callback
-  esp_now_register_recv_cb(OnDataRecv); // Register Receive Callback
-  esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_COMBO, 1, NULL, 0); // Register peer
 
   lcd.setCursor(0, 0);
   lcd.print("  Interaktive");
@@ -338,6 +299,9 @@ void check_buttons() {
     if (menu_layer == 6) menu_layer_new = 5; // Erklärung Seite 3 zu 2
     if (menu_layer == 8) menu_layer_new = 71; // Auswahl abgebrochen
     if (menu_layer == 13) menu_layer_new = 71; // Beenden abgebrochen
+
+    // Zu entfernen
+    if (menu_layer == 71) menu_layer_new = 30; // Test ob unterschiedliche Länder angezeigt werden
     
     delay(200);
   }
@@ -348,51 +312,6 @@ void check_buttons() {
     delay(200);
   }
 
-  if (menu_layer == 71) {
-    if (digitalRead(bUP) == LOW) {
-      Serial.println("Button UP clicked");
-      if (toSendStruct.data[1] < 210) {
-        toSendStruct.data[1] += 1; // Example: Increment x coordinate
-      }
-      else {
-        toSendStruct.data[1] = 0; // Reset to 0 if it exceeds 210
-      }
-      SendToSphere();
-    }
-
-    if (digitalRead(bDOWN) == LOW) {
-      Serial.println("Button DOWN clicked");
-      if (toSendStruct.data[1] > 0) {
-        toSendStruct.data[1] -= 1; // Example: Decrement x coordinate
-      }
-      else {
-        toSendStruct.data[1] = 210; // Reset to 210 if it goes below 0
-      }
-      SendToSphere();
-    }
-
-    if (digitalRead(bLEFT) == LOW) {
-      Serial.println("Button LEFT clicked");
-      if (toSendStruct.data[0] > 0) {
-        toSendStruct.data[0] -= 1; // Example: Decrement y coordinate
-      }
-      else {
-        toSendStruct.data[0] = 210; // Reset to 210 if it goes below 0
-      }
-      SendToSphere();
-    }
-
-    /*if (digitalRead(bRIGHT) == LOW) {
-      Serial.println("Button RIGHT clicked");
-      if (toSendStruct.data[0] < 210) {
-        toSendStruct.data[0] += 1; // Example: Increment y coordinate
-      }
-      else {
-        toSendStruct.data[0] = 0; // Reset to 0 if it exceeds 210
-      }
-      SendToSphere();
-    }*/
-  }
 }
 
 bool check_country(int country) {
@@ -403,38 +322,4 @@ bool check_country(int country) {
   } else { 
     return false; // Falsch
   }
-}
-
-// Wireless
-void SendToSphere() {
-  esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
-  Serial.println("x: " + String(toSendStruct.data[0]) + ", y: " + String(toSendStruct.data[1]));
-}
-
-// Callback, wenn Daten gesendet werden
-void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
-  Serial.print("Last Packet Send Status: ");
-  Serial.println(sendStatus == 0 ? "Delivery success" : "Delivery fail");
-}
-
-// Callback, wenn Daten empfangen werden
-void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
-  /*Serial.print("Received packet from: ");
-  for (int i = 0; i < 6; i++) {
-    Serial.print(mac_addr[i], HEX);
-    if (i < 5) Serial.print(":");
-  }
-  Serial.println();*/
-
-  memcpy(&receivedStruct, incomingData, sizeof(receivedStruct));
-  unsigned long rotTime_us = receivedStruct.data[0];
-  unsigned long timerTicks = receivedStruct.data[1];
-
-  /*Serial.print("Umdrehungszeit: ");
-  Serial.print(rotTime_us);
-  Serial.print(" µs, ");
-  Serial.print(rotTime_us / 1000);
-  Serial.print(" ms, ");
-  Serial.print("Timer-Ticks: ");
-  Serial.println(timerTicks);*/
 }

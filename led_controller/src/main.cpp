@@ -123,6 +123,8 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
     Serial.println(receivedStruct.data[i]);
   }
 
+  ledMatrix[receivedStruct.data[0]][receivedStruct.data[1]] = true; // Set the LED at the received coordinates to ON
+
   // LED Matrix 210x210, recievedStruct.data[0] hat x und receivedStruct.data[1] hat y Koordinate
 
   // 0 = 0b1000000000000000 = 0d32768
@@ -143,14 +145,13 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
   // 15 = 0b0000000000000001 = 0d1
   //Formel: reg_blue[0] = 0b0000000000000000 + (0b0000000000000001 << (16 - receivedStruct.data[1]));
 
-  test_data = 0b0000000000000001 << (16 - receivedStruct.data[0]);
+  /*test_data = 0b0000000000000001 << (16 - receivedStruct.data[0]);
   Serial.print("Test data: ");
-  Serial.println(test_data, BIN);
+  Serial.println(test_data, BIN);*/
 
 
-  if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 0) {
-    reg_blue[0] = 0b1000000000000000;
-    writeRegData();
+  /*if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 0) {
+    ledMatrix
   }
 
   else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 1) {
@@ -168,12 +169,13 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
   }
   else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 4) {
     reg_blue[0] = 0b0000100000000000; 
+    
     writeRegData();
   }
   else if (receivedStruct.data[0] == 0 && receivedStruct.data[1] == 5) {
     reg_blue[0] = 0b0000010000000000; 
     writeRegData();
-  }
+  }*/
 
 }
 

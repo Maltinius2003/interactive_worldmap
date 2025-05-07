@@ -20,9 +20,8 @@ uint8_t broadcastAddress[] = { 0x08, 0x3A, 0x8D, 0xCD, 0x66, 0xAF };
 
 // Erstes Byte: x Koordinate, zweites Byte: y Koordinate, drittes Byte: buttons
 
-const int dataSize = 3;
 typedef struct struct_message_to_sphere {
-  byte data[dataSize];
+  byte data[3];
 } struct_message_to_sphere;
 
 typedef struct struct_message_to_display {
