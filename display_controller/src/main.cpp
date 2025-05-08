@@ -8,14 +8,8 @@
 #include <ESP8266WiFi.h>
 #include <espnow.h>
 
-// Buttons
-#define bA D6
-#define bB D7
-#define bSTART D5
-#define bUP D3
-#define bDOWN D4
-#define bLEFT D0
-//#define bRIGHT D
+// NES Controller
+#include <NintendoExtensionCtrl.h>
 
 typedef struct struct_message_to_sphere {
   byte data[3];
@@ -39,7 +33,21 @@ struct_message_to_display receivedStruct;
 std::vector<int> playable_countries;
 std::vector<int> selected_countries;
 
-// Wireless
+// NES Controller
+ClassicController classic;
+
+// NES Controller Debounce
+const unsigned long debounceInterval = 200;
+unsigned long lastPressA = 0;
+unsigned long lastPressB = 0;
+unsigned long lastPressStart = 0;
+unsigned long lastPressSelect = 0;
+unsigned long lastPressUp = 0;
+unsigned long lastPressDown = 0;
+unsigned long lastPressLeft = 0;
+unsigned long lastPressRight = 0;
+
+// Wireless, broadcast address receiver
 uint8_t broadcastAddress[] = { 0x08, 0x3A, 0x8D, 0xCD, 0x66, 0xAF };
 
 const char* country_names[] = {
@@ -72,14 +80,6 @@ void setup() {
   lcd.backlight();
   lcd.clear();
 
-  pinMode(bA, INPUT); // Button A
-  pinMode(bB, INPUT); // Button B
-  pinMode(bSTART, INPUT); // Button START
-  pinMode(bUP, INPUT); // Button UP
-  pinMode(bDOWN, INPUT); // Button DOWN
-  pinMode(bLEFT, INPUT); // Button LEFT
-  //pinMode(bRIGHT, INPUT); // Button RIGHT
-
   WiFi.mode(WIFI_STA); // Wireless
   WiFi.disconnect();
 
@@ -92,6 +92,13 @@ void setup() {
   esp_now_register_send_cb(OnDataSent); // Register Send Callback
   esp_now_register_recv_cb(OnDataRecv); // Register Receive Callback
   esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_COMBO, 1, NULL, 0); // Register peer
+
+  // NES Controller
+  classic.begin();
+  while (!classic.connect()) {
+    Serial.println("Classic Controller not detected!");
+    delay(1000);
+  }
 
   lcd.setCursor(0, 0);
   lcd.print("  Interaktive");
@@ -306,92 +313,114 @@ void loop() {
 }
 
 void check_buttons() {
-  // Check if button A is pressed
-
   // menu_layer 0: Start Motor
   // menu_layer 1: Auswahl Standbild, Spiel
   // menu_layer 2: Standbild aktiv
   // menu_layer 31: Spielauswahl
 
+  boolean success = classic.update();
 
-  if (digitalRead(bA) == LOW) {
-    if (menu_layer == 0) menu_layer_new = 1; // Von Start Motor zu Auswahl
-    if (menu_layer == 1) menu_layer_new = 2; // Von Auswahl zu Standbild aktiv
-    if (menu_layer == 4) menu_layer_new = 5; // Erklärung Seite 1 zu 2
-    if (menu_layer == 5) menu_layer_new = 6; // Erklärung Seite 2 zu 3
-    if (menu_layer == 6) menu_layer_new = 31; // Erklärung Seite 3 zu Spielauswahl
-    if (menu_layer == 31) menu_layer_new = 7; // Spielauswahl zu Spiel
-    if (menu_layer == 71) menu_layer_new = 8; // Spiel zu Auswahl bestätigen
-    if (menu_layer == 8) menu_layer_new = 81; // Auswahl bestätigen zu checken ob richtig oder falsch
-    if (menu_layer == 12) menu_layer_new = 30; // Scoreboard zu Spielauswahl
-    if (menu_layer == 13) menu_layer_new = 12; // Beenden zu Scoreboard
-    
-    delay(200);
-  }
+  if (success) {
+    unsigned long currentTime = millis();
 
-  if (digitalRead(bB) == LOW) {
-    if (menu_layer == 1) menu_layer_new = 3; // Von Auswahl zu Spielauswahl
-    if (menu_layer == 2) menu_layer_new = 1; // Von Standbild aktiv zu Auswahl
-    if (menu_layer == 31) menu_layer_new = 4; // Von Spielauswahl zu Erklärung Seite 1
-    if (menu_layer == 4) menu_layer_new = 31; // Erklärung Seite 1 zu Spielauswahl
-    if (menu_layer == 5) menu_layer_new = 4; // Erklärung Seite 2 zu 1
-    if (menu_layer == 6) menu_layer_new = 5; // Erklärung Seite 3 zu 2
-    if (menu_layer == 8) menu_layer_new = 71; // Auswahl abgebrochen
-    if (menu_layer == 13) menu_layer_new = 71; // Beenden abgebrochen
-    
-    delay(200);
-  }
+    if (classic.buttonA() && (currentTime - lastPressA > debounceInterval)) {
+      if (menu_layer == 0) menu_layer_new = 1; // Von Start Motor zu Auswahl
+      if (menu_layer == 1) menu_layer_new = 2; // Von Auswahl zu Standbild aktiv
+      if (menu_layer == 4) menu_layer_new = 5; // Erklärung Seite 1 zu 2
+      if (menu_layer == 5) menu_layer_new = 6; // Erklärung Seite 2 zu 3
+      if (menu_layer == 6) menu_layer_new = 31; // Erklärung Seite 3 zu Spielauswahl
+      if (menu_layer == 31) menu_layer_new = 7; // Spielauswahl zu Spiel
+      if (menu_layer == 71) menu_layer_new = 8; // Spiel zu Auswahl bestätigen
+      if (menu_layer == 8) menu_layer_new = 81; // Auswahl bestätigen zu checken ob richtig oder falsch
+      if (menu_layer == 12) menu_layer_new = 30; // Scoreboard zu Spielauswahl
+      if (menu_layer == 13) menu_layer_new = 12; // Beenden zu Scoreboard
 
-  if (digitalRead(bSTART) == LOW) {
-    if (menu_layer == 71) menu_layer_new = 13;
-
-    delay(200);
-  }
-
-  if (menu_layer == 71) {
-    if (digitalRead(bUP) == LOW) {
-      Serial.println("Button UP clicked");
-      if (toSendStruct.data[1] < 210) {
-        toSendStruct.data[1] += 1; // Example: Increment x coordinate
-      }
-      else {
-        toSendStruct.data[1] = 0; // Reset to 0 if it exceeds 210
-      }
-      SendToSphere();
+      Serial.println("A");
+      lastPressA = currentTime;
     }
 
-    if (digitalRead(bDOWN) == LOW) {
-      Serial.println("Button DOWN clicked");
-      if (toSendStruct.data[1] > 0) {
-        toSendStruct.data[1] -= 1; // Example: Decrement x coordinate
-      }
-      else {
-        toSendStruct.data[1] = 210; // Reset to 210 if it goes below 0
-      }
-      SendToSphere();
+    if (classic.buttonB() && (currentTime - lastPressB > debounceInterval)) {
+      if (menu_layer == 1) menu_layer_new = 3; // Von Auswahl zu Spielauswahl
+      if (menu_layer == 2) menu_layer_new = 1; // Von Standbild aktiv zu Auswahl
+      if (menu_layer == 31) menu_layer_new = 4; // Von Spielauswahl zu Erklärung Seite 1
+      if (menu_layer == 4) menu_layer_new = 31; // Erklärung Seite 1 zu Spielauswahl
+      if (menu_layer == 5) menu_layer_new = 4; // Erklärung Seite 2 zu 1
+      if (menu_layer == 6) menu_layer_new = 5; // Erklärung Seite 3 zu 2
+      if (menu_layer == 8) menu_layer_new = 71; // Auswahl abgebrochen
+      if (menu_layer == 13) menu_layer_new = 71; // Beenden abgebrochen
+      
+      Serial.println("B");
+      lastPressB = currentTime;
     }
 
-    if (digitalRead(bLEFT) == LOW) {
-      Serial.println("Button LEFT clicked");
-      if (toSendStruct.data[0] > 0) {
-        toSendStruct.data[0] -= 1; // Example: Decrement y coordinate
-      }
-      else {
-        toSendStruct.data[0] = 210; // Reset to 210 if it goes below 0
-      }
-      SendToSphere();
+    if (classic.buttonStart() && (currentTime - lastPressStart > debounceInterval)) {
+      if (menu_layer == 0) menu_layer_new = 1; // Von Start Motor zu Auswahl
+      if (menu_layer == 71) menu_layer_new = 13;
+      
+      Serial.println("Start");
+      lastPressStart = currentTime;
     }
 
-    /*if (digitalRead(bRIGHT) == LOW) {
-      Serial.println("Button RIGHT clicked");
-      if (toSendStruct.data[0] < 210) {
-        toSendStruct.data[0] += 1; // Example: Increment y coordinate
+    if (classic.buttonSelect() && (currentTime - lastPressSelect > debounceInterval)) {
+      Serial.println("Select");
+      lastPressSelect = currentTime;
+    }
+
+    if (classic.dpadUp() && (currentTime - lastPressUp > debounceInterval)) {
+      if (menu_layer == 71) {
+        if (toSendStruct.data[1] < 210) {
+          toSendStruct.data[1] += 1; // Example: Increment x coordinate
+        }
+        else {
+          toSendStruct.data[1] = 0; // Reset to 0 if it exceeds 210
+        }
+        SendToSphere();
       }
-      else {
-        toSendStruct.data[0] = 0; // Reset to 0 if it exceeds 210
+      Serial.println("Up");
+      lastPressUp = currentTime;
+    }
+
+    if (classic.dpadDown() && (currentTime - lastPressDown > debounceInterval)) {
+      if (menu_layer == 71) {
+        if (toSendStruct.data[1] > 0) {
+          toSendStruct.data[1] -= 1; // Example: Decrement x coordinate
+        }
+        else {
+          toSendStruct.data[1] = 210; // Reset to 210 if it goes below 0
+        }
+        SendToSphere();
       }
-      SendToSphere();
-    }*/
+      Serial.println("Down");
+      lastPressDown = currentTime;
+    }
+
+    if (classic.dpadLeft() && (currentTime - lastPressLeft > debounceInterval)) {
+      if (menu_layer == 71) {
+        if (toSendStruct.data[0] > 0) {
+          toSendStruct.data[0] -= 1; // Example: Decrement y coordinate
+        }
+        else {
+          toSendStruct.data[0] = 210; // Reset to 210 if it goes below 0
+        }
+        SendToSphere();
+      }
+      Serial.println("Left");
+      lastPressLeft = currentTime;
+    }
+
+    if (classic.dpadRight() && (currentTime - lastPressRight > debounceInterval)) {
+      if (menu_layer == 71) {
+        if (toSendStruct.data[0] < 210) {
+          toSendStruct.data[0] += 1; // Example: Increment y coordinate
+        }
+        else {
+          toSendStruct.data[0] = 0; // Reset to 0 if it exceeds 210
+        }
+        SendToSphere();
+      }
+      Serial.println("Right");
+      lastPressRight = currentTime;
+    }
   }
 }
 
