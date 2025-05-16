@@ -121,7 +121,7 @@ void setup() {
   // Timer-Ticks = 404,76 µs / 0,2 µs = 2023,8 Ticks ≈ 2024
 
   // Set Muster
-  //set_matrix_letter_N();
+  set_matrix_letter_N();
   //set_matrix_letter_Z();
   //set_matrix_easy_shape();
   //set_matrix_test1();
