@@ -11,6 +11,9 @@
 // NES Controller
 #include <NintendoExtensionCtrl.h>
 
+// Relais Motor
+#define RELAIS_MOTOR D5
+
 typedef struct struct_message_to_sphere {
   byte data[3];
 } struct_message_to_sphere;
@@ -75,6 +78,9 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus);
 void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len);
 
 void setup() {
+  pinMode(RELAIS_MOTOR, OUTPUT);
+  digitalWrite(RELAIS_MOTOR, HIGH); // Relais Motor aus
+
   Serial.begin(9600); // Initialize Serial Monitor
   lcd.init(); // Initialize LCD screen
   lcd.backlight();
@@ -130,11 +136,16 @@ void loop() {
     }
 
     else if (menu_layer == 1) {
+      bitWrite(toSendStruct.data[0], 0, 0); // Standbild nicht aktiv
+      bitWrite(toSendStruct.data[0], 1, 0); // Spiel nicht aktiv
+      SendToSphere();
+
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print(" [A] Standbild");
       lcd.setCursor(0, 1);
       lcd.print(" [B] Spiel");
+      digitalWrite(RELAIS_MOTOR, LOW); // Relais Motor an
     }
 
     else if (menu_layer == 2) {
@@ -143,6 +154,8 @@ void loop() {
       lcd.print("Standbild aktiv");
       lcd.setCursor(0, 1);
       lcd.print(" [B] zurueck");
+      bitWrite(toSendStruct.data[0], 0, 1); // Standbild aktiv	
+      SendToSphere();
     }
 
     else if (menu_layer == 3) {
@@ -152,6 +165,8 @@ void loop() {
       lcd.setCursor(0, 1);
       lcd.print(" Staaten-Raten");
       delay(400);
+      bitWrite(toSendStruct.data[0], 1, 1); // Spiel aktiv
+      SendToSphere();
       menu_layer_new = 30;
     }
 
@@ -363,11 +378,13 @@ void check_buttons() {
 
     if (classic.buttonSelect() && (currentTime - lastPressSelect > debounceInterval)) {
       Serial.println("Select");
+      digitalWrite(RELAIS_MOTOR, HIGH); // Relais Motor aus
+      menu_layer_new = 0; // Motor aus
       lastPressSelect = currentTime;
     }
 
     if (classic.dpadUp() && (currentTime - lastPressUp > debounceInterval)) {
-      if (menu_layer == 71) {
+      if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[1] < 210) {
           toSendStruct.data[1] += 1; // Example: Increment x coordinate
         }
@@ -381,7 +398,7 @@ void check_buttons() {
     }
 
     if (classic.dpadDown() && (currentTime - lastPressDown > debounceInterval)) {
-      if (menu_layer == 71) {
+      if ((menu_layer == 71()||(menu_layer == 31))) {
         if (toSendStruct.data[1] > 0) {
           toSendStruct.data[1] -= 1; // Example: Decrement x coordinate
         }
@@ -395,7 +412,7 @@ void check_buttons() {
     }
 
     if (classic.dpadLeft() && (currentTime - lastPressLeft > debounceInterval)) {
-      if (menu_layer == 71) {
+      if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[0] > 0) {
           toSendStruct.data[0] -= 1; // Example: Decrement y coordinate
         }
@@ -409,7 +426,7 @@ void check_buttons() {
     }
 
     if (classic.dpadRight() && (currentTime - lastPressRight > debounceInterval)) {
-      if (menu_layer == 71) {
+      if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[0] < 210) {
           toSendStruct.data[0] += 1; // Example: Increment y coordinate
         }
