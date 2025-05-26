@@ -88,7 +88,8 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
     Serial.print("]: ");
     Serial.println(receivedStruct.data[i]);
   }*/
-  if (bitRead(received_struct.data[0], 1) == 1) { // Spiel aktiv
+  if (bitRead(received_struct.data[2], 1) == 1) { // Spiel aktiv
+    
     led_matrix_blue[received_struct.data[0]][received_struct.data[1]] = true; // Set the LED at the received coordinates to ON
   }
   // LED Matrix 210x210, recievedStruct.data[0] hat x und received_struct.data[1] hat y Koordinate
@@ -146,7 +147,7 @@ void setup() {
 
 void loop() {
   
-  if ((bitRead(received_struct.data[0], 0) == 1) || (bitRead(received_struct.data[0], 1) == 1)) { // Standbild doer Spiel aktiv
+  if ((bitRead(received_struct.data[2], 0) == 1) || (bitRead(received_struct.data[2], 1) == 1)) { // Standbild doer Spiel aktiv
     timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP); //TIM_DIV16 = 5MHz
     // Taktgeschwindigkeit des Timers anpassen
     if (new_rotation_detected) {

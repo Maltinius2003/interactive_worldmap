@@ -79,7 +79,7 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len);
 
 void setup() {
   pinMode(RELAIS_MOTOR, OUTPUT);
-  digitalWrite(RELAIS_MOTOR, HIGH); // Relais Motor aus
+  pinMode(RELAIS_MOTOR, INPUT); // Relais Motor aus
 
   Serial.begin(9600); // Initialize Serial Monitor
   lcd.init(); // Initialize LCD screen
@@ -128,6 +128,11 @@ void loop() {
     menu_layer = menu_layer_new;
   
     if (menu_layer == 0) {
+      bitWrite(toSendStruct.data[2], 0, 0); // Standbild nicht aktiv
+      bitWrite(toSendStruct.data[2], 1, 0); // Spiel nicht aktiv
+      SendToSphere();
+      pinMode(RELAIS_MOTOR, INPUT); // Relais Motor aus, würde bei HIGH nur auf 3.3V, reicht nicht um Relais zu schalten -> hochohmig
+
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("  Start Motor");
@@ -136,8 +141,8 @@ void loop() {
     }
 
     else if (menu_layer == 1) {
-      bitWrite(toSendStruct.data[0], 0, 0); // Standbild nicht aktiv
-      bitWrite(toSendStruct.data[0], 1, 0); // Spiel nicht aktiv
+      bitWrite(toSendStruct.data[2], 0, 0); // Standbild nicht aktiv
+      bitWrite(toSendStruct.data[2], 1, 0); // Spiel nicht aktiv
       SendToSphere();
 
       lcd.clear();
@@ -145,6 +150,7 @@ void loop() {
       lcd.print(" [A] Standbild");
       lcd.setCursor(0, 1);
       lcd.print(" [B] Spiel");
+      pinMode(RELAIS_MOTOR, OUTPUT); // Relais Motor an
       digitalWrite(RELAIS_MOTOR, LOW); // Relais Motor an
     }
 
@@ -154,7 +160,7 @@ void loop() {
       lcd.print("Standbild aktiv");
       lcd.setCursor(0, 1);
       lcd.print(" [B] zurueck");
-      bitWrite(toSendStruct.data[0], 0, 1); // Standbild aktiv	
+      bitWrite(toSendStruct.data[2], 0, 1); // Standbild aktiv	
       SendToSphere();
     }
 
@@ -165,7 +171,7 @@ void loop() {
       lcd.setCursor(0, 1);
       lcd.print(" Staaten-Raten");
       delay(400);
-      bitWrite(toSendStruct.data[0], 1, 1); // Spiel aktiv
+      bitWrite(toSendStruct.data[2], 1, 1); // Spiel aktiv
       SendToSphere();
       menu_layer_new = 30;
     }
@@ -173,7 +179,7 @@ void loop() {
     else if (menu_layer == 30) {
       // Rücksetzen der Auswahl
       selected_countries.clear();
-      for (int i = 0; i < sizeof(country_names) / sizeof(country_names[0]); i++) {
+      for (size_t i = 0; i < sizeof(country_names) / sizeof(country_names[0]); i++) {
         playable_countries.push_back(i);
       }
       menu_layer_new = 31; 
@@ -378,7 +384,7 @@ void check_buttons() {
 
     if (classic.buttonSelect() && (currentTime - lastPressSelect > debounceInterval)) {
       Serial.println("Select");
-      digitalWrite(RELAIS_MOTOR, HIGH); // Relais Motor aus
+      pinMode(RELAIS_MOTOR, INPUT); // Relais Motor aus
       menu_layer_new = 0; // Motor aus
       lastPressSelect = currentTime;
     }
@@ -386,7 +392,7 @@ void check_buttons() {
     if (classic.dpadUp() && (currentTime - lastPressUp > debounceInterval)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[1] < 210) {
-          toSendStruct.data[1] += 1; // Example: Increment x coordinate
+          toSendStruct.data[1] += 1; // Example: Increment y coordinate
         }
         else {
           toSendStruct.data[1] = 0; // Reset to 0 if it exceeds 210
@@ -398,9 +404,9 @@ void check_buttons() {
     }
 
     if (classic.dpadDown() && (currentTime - lastPressDown > debounceInterval)) {
-      if ((menu_layer == 71()||(menu_layer == 31))) {
+      if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[1] > 0) {
-          toSendStruct.data[1] -= 1; // Example: Decrement x coordinate
+          toSendStruct.data[1] -= 1; // Example: Decrement y coordinate
         }
         else {
           toSendStruct.data[1] = 210; // Reset to 210 if it goes below 0
@@ -414,7 +420,7 @@ void check_buttons() {
     if (classic.dpadLeft() && (currentTime - lastPressLeft > debounceInterval)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[0] > 0) {
-          toSendStruct.data[0] -= 1; // Example: Decrement y coordinate
+          toSendStruct.data[0] -= 1; // Example: Decrement x coordinate
         }
         else {
           toSendStruct.data[0] = 210; // Reset to 210 if it goes below 0
@@ -428,7 +434,7 @@ void check_buttons() {
     if (classic.dpadRight() && (currentTime - lastPressRight > debounceInterval)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[0] < 210) {
-          toSendStruct.data[0] += 1; // Example: Increment y coordinate
+          toSendStruct.data[0] += 1; // Example: Increment x coordinate
         }
         else {
           toSendStruct.data[0] = 0; // Reset to 0 if it exceeds 210
