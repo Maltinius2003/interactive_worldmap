@@ -12,7 +12,7 @@
 
 hw_timer_t *timer = NULL;
 
-uint32_t timer_ticks_arr[10] = {2024}; // Vorbelegen
+uint32_t timer_ticks_arr[10] = {2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024}; // Array to store timer ticks for each rotation
 const int data_size = 3;
 
 typedef struct struct_message_to_sphere {
@@ -32,6 +32,7 @@ uint16_t reg_blue[12] = {0b0000000000000000}; // Registerdaten
 uint16_t reg_red[12] = {0b0000000000000000}; // Registerdaten
 
 bool led_matrix_blue[210][210] = {false}; 
+// bool led_matrix_red[210][210] = {false};
 
 
 void set_matrix_easy_shape();
@@ -58,7 +59,7 @@ void IRAM_ATTR timer1ISR() {
   digitalWrite(LATCH_PIN, LOW);
   for (int j = 0; j < 16; j++) {
     digitalWrite(CLOCK_PIN, LOW);
-    digitalWrite(DATA_PIN, (reg_blue[0] >> j) & 0x01);
+    digitalWrite(DATA_PIN_BLUE, (reg_blue[0] >> j) & 0x01);
     digitalWrite(CLOCK_PIN, HIGH);
   }
   digitalWrite(LATCH_PIN, HIGH);
@@ -90,7 +91,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 
 void setup() {
-  pinMode(DATA_PIN, OUTPUT);
+  pinMode(DATA_PIN_BLUE, OUTPUT);
   pinMode(CLOCK_PIN, OUTPUT);
   pinMode(LATCH_PIN, OUTPUT);
   pinMode(HALL_PIN, INPUT);

@@ -4,7 +4,7 @@
 #include <ESP8266TimerInterrupt.h>
 
 // Pins am ESP8266 
-#define DATA_PIN D5  // SDI
+#define DATA_PIN_BLUE D5  // SDI
 #define CLOCK_PIN D6 // CLK
 #define LATCH_PIN D7 // LE
 #define HALL_PIN D1 // Hall Sensor
@@ -33,16 +33,20 @@ uint16_t reg_red[12] = {0b0000000000000000}; // Registerdaten
 // 210 x 210 LED Matrix
 bool led_matrix_blue[210][210] = {false}; // 2D Array to store LED states
 
-void write_reg_data();
 void set_matrix_easy_shape();
 void set_matrix_test1();
 void set_matrix_NSEW();
+void set_one_row(int row);
+void set_one_column(int column);
 void set_matrix_letter_Z();
 void set_matrix_letter_N();
 void set_matrix_letter_Sigma();
 void set_matrix_world();
 
 volatile int curr_column = 0; // Counter to track the number of calls
+
+// old position pointer
+int old_position[2] = {0, 0}; // Old position of the LED in the matrix
 
 // Hall Sensor
 volatile unsigned long last_trigger_time = 0;
@@ -52,12 +56,35 @@ volatile bool new_rotation_detected = false;
 volatile int tick_index = 0; // Index for circular array
 
 void IRAM_ATTR timer1ISR() {
-  for (int i = 0; i < 16; i++) { // Berechne die aktuelle Zeile
-    bitWrite(reg_blue[0], i, led_matrix_blue[curr_column % 210][i]);
+  // Portmanipulation schneller als digitalWrite
+
+  // Latch (LE) LOW
+  GPOC |= (1 << 13);   // set GPIO13 LOW (D7)
+
+  for (int j = 0; j < 210; j++) {
+    // CLK LOW
+    GPOC |= (1 << 12); // GPIO12 (D6) LOW
+
+    // SDI setzen je nach LED-Zustand
+    if (led_matrix_blue[curr_column % 210][j]) {
+      GPOS |= (1 << 14);  // GPIO14 (D5) HIGH
+    } else {
+      GPOC |= (1 << 14);  // GPIO14 (D5) LOW
+    }
+
+    // CLK HIGH
+    GPOS |= (1 << 12); // GPIO12 (D6) HIGH
   }
-  write_reg_data();
-  curr_column = (curr_column + 1) % 210; // Inkrementiere und begrenze currColumn auf 0-209
+
+  // Latch (LE) HIGH
+  GPOS |= (1 << 13); // GPIO13 (D7) HIGH
+
+  // Latch wieder LOW
+  GPOC |= (1 << 13); // GPIO13 (D7) LOW
+
+  curr_column = (curr_column + 1) % 210;
 }
+
 
 
 // Interrupt-Service-Routine für den Hall-Sensor
@@ -89,8 +116,12 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
     Serial.println(receivedStruct.data[i]);
   }*/
   if (bitRead(received_struct.data[2], 1) == 1) { // Spiel aktiv
-    
+
+    led_matrix_blue[old_position[0]][old_position[1]] = false; // Set the old LED position to OFF    
     led_matrix_blue[received_struct.data[0]][received_struct.data[1]] = true; // Set the LED at the received coordinates to ON
+
+    old_position[0] = received_struct.data[0]; // Update old position x
+    old_position[1] = received_struct.data[1]; // Update old position y
   }
   // LED Matrix 210x210, recievedStruct.data[0] hat x und received_struct.data[1] hat y Koordinate
   
@@ -105,7 +136,7 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
 void setup() {
   //Serial.begin(9600); // //Serial Monitor für Debugging
 
-  pinMode(DATA_PIN, OUTPUT);
+  pinMode(DATA_PIN_BLUE, OUTPUT);
   pinMode(CLOCK_PIN, OUTPUT);
   pinMode(LATCH_PIN, OUTPUT);
   pinMode(HALL_PIN, INPUT);
@@ -122,13 +153,15 @@ void setup() {
   // Timer-Ticks = 404,76 µs / 0,2 µs = 2023,8 Ticks ≈ 2024
 
   // Set Muster
-  set_matrix_letter_N();
+  //set_matrix_letter_N();
   //set_matrix_letter_Z();
   //set_matrix_easy_shape();
   //set_matrix_test1();
   //set_matrix_NSEW();
   //set_matrix_letter_Sigma();
   //set_matrix_world();
+
+  set_one_column(0); // Set the first column to ON
 
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
@@ -196,29 +229,6 @@ void loop() {
   }
 }
 
-// sendet 16 Bit an das Register
-void write_reg_data() {
-  digitalWrite(LATCH_PIN, LOW); // Latch deaktivieren
-
-  /*for (int i = 12; i >= 0; i--) {
-    for (int j = 0; j < 16; j++) {
-      digitalWrite(CLOCK_PIN, LOW); // Clock low
-      digitalWrite(DATA_PIN, (reg_blue[i] >> j) & 0x01); // Bit setzen
-      digitalWrite(CLOCK_PIN, HIGH); // Bit übernehmen
-    }
-  }*/
-  
-  for (int j = 0; j < 16; j++) {
-    digitalWrite(CLOCK_PIN, LOW); // Clock low
-    digitalWrite(DATA_PIN, (reg_blue[0] >> j) & 0x01); // Bit setzen
-    digitalWrite(CLOCK_PIN, HIGH); // Bit übernehmen
-  }
-
-  digitalWrite(LATCH_PIN, HIGH); // Latch übernehmen
-  delayMicroseconds(10);
-  digitalWrite(LATCH_PIN, LOW);  // Latch wieder deaktivieren
-}
-
 void set_matrix_easy_shape() {
   led_matrix_blue[0][0] = true; // Set the first LED to ON
   led_matrix_blue[0][2] = true; // Set the second LED to ON
@@ -257,6 +267,19 @@ void set_matrix_NSEW() { // North South East West
     }
   }  
 }
+
+void set_one_row(int row) {
+  for (int i = 0; i < 210; i++) {
+    led_matrix_blue[i][row] = true; // Set all LEDs in the row to ON
+  }
+}
+
+void set_one_column(int column) {
+  for (int i = 0; i < 210; i++) {
+    led_matrix_blue[column][i] = true; // Set all LEDs in the column to ON
+  }
+}
+
 
 void set_matrix_letter_Z() {
   // Set the first column to ON
