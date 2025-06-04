@@ -467,6 +467,10 @@ void SendToSphere() {
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   Serial.print("Last Packet Send Status: ");
   Serial.println(sendStatus == 0 ? "Delivery success" : "Delivery fail");
+  Serial.print("x: ");
+  Serial.print(toSendStruct.data[0]);
+  Serial.print(", y: ");
+  Serial.println(toSendStruct.data[1]);
 }
 
 // Callback, wenn Daten empfangen werden

@@ -12,34 +12,54 @@ if not image_path:
     raise FileNotFoundError("No file was selected.")
 
 # Bild einlesen und in Graustufen umwandeln
-image = Image.open(image_path).convert("L")  # "L" = Luminanz (Graustufen)
-image = image.resize((210, 210))  # sicherstellen, dass Bild 210x210 ist
+image = Image.open(image_path).convert("L")
+image = image.resize((210, 210))
 
-# Bilddaten als NumPy-Array
+# Grauwert-Array und binäre Schwelle
 gray_array = np.array(image)
-
-# Schwellwert (z. B. 128)
 threshold = 128
 bool_matrix = gray_array < threshold
 
-# Matrix als Textdatei speichern
+# Dateinamen vorbereiten
 original_name = os.path.splitext(os.path.basename(image_path))[0]
 script_dir = os.path.dirname(os.path.abspath(__file__))
-output_path = os.path.join(script_dir, f"{original_name}_MATRIX.txt")
-np.savetxt(output_path, bool_matrix.astype(int), fmt='%d')
 
-# Matrix für Arduino-Code formatieren (auf dem Kopf), 0,0 ist unten
-arduino_matrix = np.flipud(bool_matrix)
+# === 1. NORMALE MATRIX ===
+
+# Speichern als einfache Matrix-Datei
+matrix_path = os.path.join(script_dir, f"{original_name}_MATRIX.txt")
+np.savetxt(matrix_path, bool_matrix.astype(int), fmt='%d')
+
+# Arduino-Code-Zuweisungen
 arduino_code = ""
-
-for row_idx, row in enumerate(arduino_matrix):
+for row_idx, row in enumerate(bool_matrix):
     for col_idx, val in enumerate(row):
         if val:
-            arduino_code += f"led_matrix[{row_idx}][{col_idx}] = true;\n"
+            arduino_code += f"led_matrix_blue[{col_idx}][{row_idx}] = true;\n"
 
-arduino_output_path = os.path.join(script_dir, f"{original_name}_ARDUINO_CODE.txt")
-with open(arduino_output_path, "w") as f:
+arduino_code_path = os.path.join(script_dir, f"{original_name}_ARDUINO_CODE.txt")
+with open(arduino_code_path, "w") as f:
     f.write(arduino_code)
 
-print(f"Matrix saved to {output_path}")
-print(f"Arduino matrix saved to {arduino_output_path}")
+# === 2. GESPIEGELTE MATRIX ===
+
+flipped_matrix = np.flipud(bool_matrix)
+
+flipped_matrix_path = os.path.join(script_dir, f"{original_name}_MATRIX_FLIPPED.txt")
+np.savetxt(flipped_matrix_path, flipped_matrix.astype(int), fmt='%d')
+
+flipped_code = ""
+for row_idx, row in enumerate(flipped_matrix):
+    for col_idx, val in enumerate(row):
+        if val:
+            flipped_code += f"led_matrix_blue[{col_idx}][{row_idx}] = true;\n"
+
+flipped_code_path = os.path.join(script_dir, f"{original_name}_ARDUINO_CODE_FLIPPED.txt")
+with open(flipped_code_path, "w") as f:
+    f.write(flipped_code)
+
+# === Meldung ===
+print(f"Normale Matrix gespeichert unter:\n{matrix_path}")
+print(f"Normale Arduino-Zuweisungen unter:\n{arduino_code_path}")
+print(f"Flip-Matrix gespeichert unter:\n{flipped_matrix_path}")
+print(f"Flip-Arduino-Zuweisungen unter:\n{flipped_code_path}")
