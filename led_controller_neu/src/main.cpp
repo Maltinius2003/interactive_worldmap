@@ -10,8 +10,8 @@
 
 // GPIO-Masken vorbereiten
 constexpr uint32_t latch_mask = 1UL << LATCH_PIN;
-const uint32_t clock_mask = 1UL << CLOCK_PIN;
-const uint32_t data_mask  = 1UL << DATA_PIN_BLUE;
+constexpr uint32_t clock_mask = 1UL << CLOCK_PIN;
+constexpr uint32_t data_mask  = 1UL << DATA_PIN_BLUE;
 
 #define STEPS_PER_ROTATION 210
 

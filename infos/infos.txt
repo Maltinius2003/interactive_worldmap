@@ -1,3 +1,5 @@
 MAC:
 großes ESP8266 Board (display_controller): 44:17:93:1B:B0:6F
 kleines ESP8266 Board (led_controller): 08:3A:8D:CD:66:AF
+
+1 (led_controller_neu): 30:ED:A0:20:92:D8
