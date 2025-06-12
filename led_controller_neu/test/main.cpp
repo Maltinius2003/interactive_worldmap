@@ -23,10 +23,11 @@ const int data_size = 3;
 
 typedef struct struct_message_to_sphere {
   byte data[data_size];
+  bool on; 
 } struct_message_to_sphere;
 
 typedef struct struct_message_to_display {
-  unsigned long data[2];
+  bool on;
 } struct_message_to_display;
 
 struct_message_to_sphere received_struct;
@@ -48,6 +49,8 @@ volatile unsigned long last_trigger_time = 0;
 volatile unsigned long rotation_time_us = 0;
 volatile bool new_rotation_detected = false;
 volatile int tick_index = 0;
+
+bool on_flag_display_controller = false; 
 
 /*
 void IRAM_ATTR timer1ISR() {
@@ -108,6 +111,12 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
     old_position[0] = received_struct.data[0];
     old_position[1] = received_struct.data[1];
   }
+
+  // set on_flag_display_controller
+  if (on_flag_display_controller == false && received_struct.on == true) {
+    on_flag_display_controller = true; // Set the flag to true when the display_controller sends the start message
+    Serial.println("Display controller started");
+  }
 }
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
@@ -122,9 +131,9 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(HALL_PIN), hallISR, FALLING);
 
-  timer = timerBegin(0, 80, true);
-  timerAttachInterrupt(timer, &timer1ISR, true);
-  timerAlarmWrite(timer, 2024, true);
+  timer = timerBegin(0, 80, true); // 80 MHz clock, count up
+  timerAttachInterrupt(timer, &timer1ISR, true); // true for edge-triggered
+  timerAlarmWrite(timer, 2024, true); // Set initial alarm value
   timerAlarmEnable(timer);
 
   set_one_column(0); // Set the first column to ON
@@ -136,14 +145,21 @@ void setup() {
   if (esp_now_init() != ESP_OK) return;
   esp_now_register_recv_cb(OnDataRecv);
   esp_now_register_send_cb(OnDataSent);
-
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, broadcast_address, 6);
   peerInfo.channel = 1;
   peerInfo.encrypt = false;
-  // peerInfo.ifidx and peerInfo.lmk are optional and can be left as default
-
   esp_now_add_peer(&peerInfo);
+
+  // send start message to display_controller and wait for led_controller start message
+  to_send_struct.on = true;
+
+  while (!on_flag_display_controller || !to_send_struct.on) { 
+    delay(500);
+    Serial.println("on_flag_display_controller: " + String(on_flag_display_controller) + ", to_send_struct.on: " + String(to_send_struct.on));
+    to_send_struct.on = true;
+    esp_now_send(broadcast_address, (uint8_t *)&to_send_struct, sizeof(to_send_struct));
+  }
 }
 
 void loop() {
@@ -163,11 +179,11 @@ void loop() {
         for (int i = 0; i < 10; i++) sum += timer_ticks_arr[i];
         uint32_t average_ticks = sum / 10;
 
-        timerAlarmWrite(timer, average_ticks, true);
+        timerAlarmWrite(timer, average_ticks-5, true);
 
-        to_send_struct.data[0] = rot_time_us;
-        to_send_struct.data[1] = average_ticks;
-        esp_now_send(broadcast_address, (uint8_t *)&to_send_struct, sizeof(to_send_struct));
+        //to_send_struct.data[0] = rot_time_us;
+        //to_send_struct.data[1] = average_ticks;
+        //esp_now_send(broadcast_address, (uint8_t *)&to_send_struct, sizeof(to_send_struct));
       }
     }
   } else {

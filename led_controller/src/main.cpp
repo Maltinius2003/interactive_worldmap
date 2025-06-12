@@ -16,10 +16,11 @@ uint32_t timer_ticks_arr[10] = {2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 
 const int data_size = 3;
 typedef struct struct_message_to_sphere {
   byte data[data_size];
+  bool on; 
 } struct_message_to_sphere;
 
 typedef struct struct_message_to_display {
-  unsigned long data[2];
+  bool on;
 } struct_message_to_display;
 
 struct_message_to_sphere received_struct;
@@ -51,8 +52,9 @@ int old_position[2] = {0, 0}; // Old position of the LED in the matrix
 volatile unsigned long last_trigger_time = 0;
 volatile unsigned long rotation_time_us = 0;
 volatile bool new_rotation_detected = false;
-
 volatile int tick_index = 0; // Index for circular array
+
+bool on_flag_display_controller = false; 
 
 void IRAM_ATTR timer1ISR() {
   // Portmanipulation schneller als digitalWrite
@@ -118,10 +120,17 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
 
     led_matrix_blue[old_position[0]][old_position[1]] = false; // Set the old LED position to OFF    
     led_matrix_blue[received_struct.data[0]][received_struct.data[1]] = true; // Set the LED at the received coordinates to ON
-
     old_position[0] = received_struct.data[0]; // Update old position x
     old_position[1] = received_struct.data[1]; // Update old position y
   }
+
+  // set on_flag_display_controller
+  if (on_flag_display_controller == false && received_struct.on == true) {
+    on_flag_display_controller = true; // Set the flag to true when the display_controller sends the start message
+    Serial.println("Display controller started");
+  }
+    
+
   // LED Matrix 210x210, recievedStruct.data[0] hat x und received_struct.data[1] hat y Koordinate
   
 }
@@ -133,7 +142,7 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
 }
 
 void setup() {
-  //Serial.begin(9600); // //Serial Monitor für Debugging
+  Serial.begin(9600); // //Serial Monitor für Debugging
 
   pinMode(DATA_PIN_BLUE, OUTPUT);
   pinMode(CLOCK_PIN, OUTPUT);
@@ -168,14 +177,22 @@ void setup() {
   WiFi.disconnect();
 
   // Init ESP-NOW
-  if (esp_now_init() != 0) {
-    //Serial.println("Error initializing ESP-NOW");
-    return;
-  }
+  if (esp_now_init() != 0) return;
   esp_now_set_self_role(ESP_NOW_ROLE_COMBO); // Set ESP-NOW Role
   esp_now_register_send_cb(OnDataSent); // Register Send Callback
   esp_now_register_recv_cb(OnDataRecv); // Register Receive Callback
   esp_now_add_peer(broadcast_address, ESP_NOW_ROLE_COMBO, 1, NULL, 0); // Register peer
+
+  // send start message to display_controller
+  to_send_struct.on = true;
+
+  while (!on_flag_display_controller || !to_send_struct.on) { 
+    delay(500);
+    Serial.println("on_flag_display_controller: " + String(on_flag_display_controller) + ", to_send_struct.on: " + String(to_send_struct.on));
+    to_send_struct.on = true;
+    esp_now_send(broadcast_address, (uint8_t *)&to_send_struct, sizeof(to_send_struct));
+  }
+
 }
 
 void loop() {
@@ -218,10 +235,10 @@ void loop() {
         timer1_write(average_ticks-5);
 
         // Datenstruktur für Versand
-        to_send_struct.data[0] = rot_time_us;
-        to_send_struct.data[1] = average_ticks;
+        // to_send_struct.data[0] = rot_time_us;
+        // to_send_struct.data[1] = average_ticks;
 
-        esp_now_send(broadcast_address, (uint8_t *)&to_send_struct, sizeof(to_send_struct));
+        // esp_now_send(broadcast_address, (uint8_t *)&to_send_struct, sizeof(to_send_struct));
       }
     }
   } else {
