@@ -7,7 +7,7 @@ const int CLK_PIN = 7;  // Clock (CLK)
 const int LE_PIN = 16;  // Latch Enable (LE)
 
 // Delay between LED states
-const int BLINK_DELAY = 100; // milliseconds
+const int BLINK_DELAY = 20; // milliseconds
 uint16_t data1; // Variable to hold the data to be shifted out
 uint16_t data2;
 
@@ -17,6 +17,7 @@ bool data_all_red[208];
 void shiftOutOne_blue(uint16_t data);
 void runningLightOneRegister_blue();
 void shiftRunningLight_blue(int registerCount);
+void shiftRunningLight_two_blue(int registerCount);
 void allOnOneRegister_blue();
 
 void shiftOutOne_red(uint16_t data);
@@ -28,6 +29,9 @@ void set_blue_registers();
 void set_every_second_led_blue();
 void set_red_registers();
 void set_every_second_led_red();
+
+void set_every_led_blue();
+void set_every_led_red();
 
 void setup() {
     pinMode(SDI_PIN_BLUE, OUTPUT);
@@ -65,10 +69,14 @@ void loop() {
         */
 
     
-    //shiftRunningLight_blue(6);
+    //shiftRunningLight_two_blue(13);
     //allOnOneRegister_blue(); // Geht auch für alle Register
-    allOnOneRegister_red(); // Geht auch für alle Register
-    // set_every_second_led_blue(); // Set every second LED to ON
+    //allOnOneRegister_red(); // Geht auch für alle Register
+    //set_every_led_blue(); 
+    //set_every_second_led_blue(); // Set every second LED to ON
+
+    shiftOutOne_red(0xF0F0); // Initialize all red LEDs to on
+
     delay(BLINK_DELAY);
 }
 
@@ -156,6 +164,42 @@ void shiftRunningLight_blue(int registerCount) {
   }
 }
 
+void shiftRunningLight_two_blue(int registerCount) {
+  int ledCount = 16 * registerCount;
+
+  digitalWrite(SDI_PIN_BLUE, HIGH);
+  digitalWrite(CLK_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(CLK_PIN, LOW);
+  digitalWrite(SDI_PIN_BLUE, LOW);
+  digitalWrite(LE_PIN, LOW);
+  delayMicroseconds(10);
+
+  digitalWrite(SDI_PIN_BLUE, HIGH);
+  digitalWrite(CLK_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(CLK_PIN, LOW);
+  digitalWrite(SDI_PIN_BLUE, LOW);
+  digitalWrite(LE_PIN, LOW);
+  delayMicroseconds(10);
+
+  delay(BLINK_DELAY);
+
+
+  for (int i = ledCount - 1; i >= 0; i--) {
+      
+      digitalWrite(CLK_PIN, HIGH);
+      delayMicroseconds(10);
+      digitalWrite(CLK_PIN, LOW);
+
+      digitalWrite(LE_PIN, HIGH);
+      delayMicroseconds(10);
+      digitalWrite(LE_PIN, LOW);
+
+      delay(BLINK_DELAY);
+  }
+}
+
 void shiftRunningLight_red(int registerCount) {
   int ledCount = 16 * registerCount;
 
@@ -197,9 +241,44 @@ void set_blue_registers() {
   digitalWrite(LE_PIN, LOW);
 }
 
+void set_red_registers() {
+
+  // iterate data_all_red and directly shift out, dont use data1 or data2
+  for (int i = 0; i < 208; i++) {
+    digitalWrite(SDI_PIN_RED, data_all_red[i] ? HIGH : LOW);
+    digitalWrite(CLK_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(CLK_PIN, LOW);
+  }
+  digitalWrite(LE_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(LE_PIN, LOW);
+}
+
 void set_every_second_led_blue() {
   for (int i = 0; i < 208; i++) {
     data_all_blue[i] = (i % 2 == 0); // Set every second LED to ON
   }
   set_blue_registers();
+}
+
+void set_every_second_led_red() {
+  for (int i = 0; i < 208; i++) {
+    data_all_red[i] = (i % 2 == 0); // Set every second LED to ON
+  }
+  set_red_registers();
+}
+
+void set_every_led_blue() {
+  for (int i = 0; i < 208; i++) {
+    data_all_blue[i] = true; // Set every LED to ON
+  }
+  set_blue_registers();
+}
+
+void set_every_led_red() {
+  for (int i = 0; i < 208; i++) {
+    data_all_red[i] = true; // Set every LED to ON
+  }
+  set_red_registers();
 }
