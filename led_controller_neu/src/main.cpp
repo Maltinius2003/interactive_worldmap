@@ -17,6 +17,7 @@ void write_leds_sync();
 void all_on();
 void every_second_on();
 void running_light();
+void running_light_multiple(); // 0 light, 15. light, 31. light ...
 void set_specific_led_blue(int index);
 void set_specific_led_red(int index);
 
@@ -46,7 +47,7 @@ void setup() {
 }
 
 void loop() {
-  running_light();
+  running_light_multiple(); // Beispiel: Lauflicht mit mehreren LEDs
   write_leds_sync(); // Synchronisiere den Zustand der LEDs
 }
 
@@ -96,6 +97,28 @@ void running_light() {
   pos = (pos + 1) % LED_COUNT;
   delay(BLINK_DELAY);
 }
+
+void running_light_multiple() { // 0 light, 15. light, 31. light ... 
+  static int pos = 0;
+
+  // Alles aus
+  for (int i = 0; i < LED_COUNT; i++) {
+    data_all_blue[i] = false;
+    data_all_red[i]  = false;
+  }
+  // Setze aktuelle Position
+  data_all_blue[pos] = true;
+  data_all_red[pos]  = true;
+  // Setze alle 16. Licht ab aktueller Position
+  for (int offset = 0; offset < LED_COUNT; offset += 16) {
+    int idx = (pos + offset) % LED_COUNT;
+    data_all_blue[idx] = true;
+    data_all_red[idx] = true;
+  }
+  pos = (pos + 1) % LED_COUNT;
+  delay(BLINK_DELAY);
+}
+
 
 void set_specific_led_blue(int index) {
   if (index >= 0 && index < LED_COUNT) {
