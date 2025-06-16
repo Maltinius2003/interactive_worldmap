@@ -1,4 +1,4 @@
-#include <Arduino.h>
+  #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
 #include <vector>
@@ -59,7 +59,10 @@ uint8_t broadcastAddress[] = { 0x08, 0x3A, 0x8D, 0xCD, 0x66, 0xAF };
 
 const char* country_names[] = {
   "Deutschland", "Frankreich", "Italien", "Spanien", "Grossbritannien",
-  "Russland", "Schweden", "Kanada", "USA", "Australien"
+  "Russland", "Schweden", "Kanada", "USA", "Australien", "Brasilien",
+  "China", "Indien", "Argentinien", "Mexiko", "Japan", "Suedafrika",
+  "Aegypten", "Algerien", "Libyen", "Saudi Arabien",
+  "Ukraine", "Kasachstan", "Iran", "Mongolei", "Daenemark", "Tuerkei"
 };
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -278,7 +281,9 @@ void loop() {
 
     else if (menu_layer == 81) {
       played_rounds++;
-      if (check_country(player_country)) {
+      Serial.print("Rand Country: ");
+      Serial.println(rand_country);
+      if (check_country(rand_country)) {
         menu_layer_new = 9; 
       } else {
         menu_layer_new = 10;
@@ -478,6 +483,7 @@ void check_buttons() {
   }
 }
 
+/*
 bool check_country(int country) {
   int check = 0;
   check = random(0, 10); // Zufallszahl zwischen 0 und 9
@@ -485,6 +491,68 @@ bool check_country(int country) {
     return true; // Richtig
   } else { 
     return false; // Falsch
+  }
+}
+*/
+
+bool check_country(int country) {
+  switch (country) {
+    case 0: // Deutschland
+      return (toSendStruct.data[0] >= 103 && toSendStruct.data[0] <= 105 && toSendStruct.data[1] >= 67 && toSendStruct.data[1] <= 75);
+    case 1: // Frankreich
+      return (toSendStruct.data[0] >= 99 && toSendStruct.data[0] <= 103 && toSendStruct.data[1] >= 70 && toSendStruct.data[1] <= 83);
+    case 2: // Italien
+      return (toSendStruct.data[0] >= 105 && toSendStruct.data[0] <= 109 && toSendStruct.data[1] >= 77 && toSendStruct.data[1] <= 85);
+    case 3: // Spanien
+      return (toSendStruct.data[0] >= 96 && toSendStruct.data[0] <= 99 && toSendStruct.data[1] >= 82 && toSendStruct.data[1] <= 89);
+    case 4: // Grossbritannien
+      return (toSendStruct.data[0] >= 95 && toSendStruct.data[0] <= 100 && toSendStruct.data[1] >= 59 && toSendStruct.data[1] <= 69);
+    case 5: // Russland
+      return (toSendStruct.data[0] >= 127 && toSendStruct.data[0] <= 209 && toSendStruct.data[1] >= 17 && toSendStruct.data[1] <= 71);
+    case 6: // Schweden
+      return (toSendStruct.data[0] >= 106 && toSendStruct.data[0] <= 113 && toSendStruct.data[1] >= 34 && toSendStruct.data[1] <= 61);
+    case 7: // Kanada
+      return (toSendStruct.data[0] >= 10 && toSendStruct.data[0] <= 92 && toSendStruct.data[1] >= 1 && toSendStruct.data[1] <= 67);
+    case 8: // USA
+      return (toSendStruct.data[0] >= 25 && toSendStruct.data[0] <= 68 && toSendStruct.data[1] >= 68 && toSendStruct.data[1] <= 106);
+    case 9: // Australien
+      return (toSendStruct.data[0] >= 166 && toSendStruct.data[0] <= 188 && toSendStruct.data[1] >= 151 && toSendStruct.data[1] <= 191);
+    case 10: // Brasilien
+      return (toSendStruct.data[0] >= 63 && toSendStruct.data[0] <= 79 && toSendStruct.data[1] >= 138 && toSendStruct.data[1] <= 188);
+    case 11: // China
+      return (toSendStruct.data[0] >= 142 && toSendStruct.data[0] <= 183 && toSendStruct.data[1] >= 70 && toSendStruct.data[1] <= 91);
+    case 12: // Indien
+      return (toSendStruct.data[0] >= 139 && toSendStruct.data[0] <= 148 && toSendStruct.data[1] >= 105 && toSendStruct.data[1] <= 123);
+    case 13: // Argentinien
+      return (toSendStruct.data[0] >= 59 && toSendStruct.data[0] <= 64 && toSendStruct.data[1] >= 162 && toSendStruct.data[1] <= 210);
+    case 14: // Mexiko
+      return (toSendStruct.data[0] >= 32 && toSendStruct.data[0] <= 47 && toSendStruct.data[1] >= 95 && toSendStruct.data[1] <= 119);
+    case 15: // Japan
+      return (toSendStruct.data[0] >= 176 && toSendStruct.data[0] <= 183 && toSendStruct.data[1] >= 80 && toSendStruct.data[1] <= 96);
+    case 16: // Südafrika
+      return (toSendStruct.data[0] >= 109 && toSendStruct.data[0] <= 118 && toSendStruct.data[1] >= 166 && toSendStruct.data[1] <= 178);
+    case 17: // Ägypten
+      return (toSendStruct.data[0] >= 115 && toSendStruct.data[0] <= 120 && toSendStruct.data[1] >= 98 && toSendStruct.data[1] <= 113);
+    case 18: // Algerien
+      return (toSendStruct.data[0] >= 97 && toSendStruct.data[0] <= 104 && toSendStruct.data[1] >= 91 && toSendStruct.data[1] <= 112);
+    case 19: // Libyen
+      return (toSendStruct.data[0] >= 105 && toSendStruct.data[0] <= 114 && toSendStruct.data[1] >= 95 && toSendStruct.data[1] <= 115);
+    case 20: // Saudi-Arabien
+      return (toSendStruct.data[0] >= 120 && toSendStruct.data[0] <= 130 && toSendStruct.data[1] >= 100 && toSendStruct.data[1] <= 113);
+    case 21: // Ukraine
+      return (toSendStruct.data[0] >= 115 && toSendStruct.data[0] <= 124 && toSendStruct.data[1] >= 67 && toSendStruct.data[1] <= 79);
+    case 22: // Kasachstan
+      return (toSendStruct.data[0] >= 130 && toSendStruct.data[0] <= 145 && toSendStruct.data[1] >= 64 && toSendStruct.data[1] <= 83);
+    case 23: // Iran
+      return (toSendStruct.data[0] >= 129 && toSendStruct.data[0] <= 138 && toSendStruct.data[1] >= 91 && toSendStruct.data[1] <= 104);
+    case 24: // Mongolei
+      return (toSendStruct.data[0] >= 145 && toSendStruct.data[0] <= 155 && toSendStruct.data[1] >= 66 && toSendStruct.data[1] <= 83);
+    case 25: // Dänemark
+      return (toSendStruct.data[0] >= 105 && toSendStruct.data[0] <= 106 && toSendStruct.data[1] >= 60 && toSendStruct.data[1] <= 65);
+    case 26: // Türkei
+      return (toSendStruct.data[0] >= 115 && toSendStruct.data[0] <= 124 && toSendStruct.data[1] >= 84 && toSendStruct.data[1] <= 90);
+    default:
+      return false;
   }
 }
 
@@ -506,20 +574,7 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
 
 // Callback, wenn Daten empfangen werden
 void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
-  
-
   memcpy(&receivedStruct, incomingData, sizeof(receivedStruct));
-  // unsigned long rotTime_us = receivedStruct.data[0];
-  // unsigned long timerTicks = receivedStruct.data[1];
-
   on_flag_led_controller = receivedStruct.on; // Set on_flag_led_controller based on received data
   Serial.println("Received on_flag_led_controller: " + String(on_flag_led_controller));
-
-  /*Serial.print("Umdrehungszeit: ");
-  Serial.print(rotTime_us);
-  Serial.print(" µs, ");
-  Serial.print(rotTime_us / 1000);
-  Serial.print(" ms, ");
-  Serial.print("Timer-Ticks: ");
-  Serial.println(timerTicks);*/
 }
