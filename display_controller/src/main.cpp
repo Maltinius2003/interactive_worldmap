@@ -1,4 +1,4 @@
-  #include <Arduino.h>
+#include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
 #include <vector>
@@ -16,11 +16,11 @@
 
 typedef struct struct_message_to_sphere {
   byte data[3];
-  bool on; 
+  bool startup_flag; 
 } struct_message_to_sphere;
 
 typedef struct struct_message_to_display {
-  bool on;
+  bool startup_flag;
 } struct_message_to_display;
 
 /*const char* country_names[] = {
@@ -51,11 +51,12 @@ unsigned long lastPressDown = 0;
 unsigned long lastPressLeft = 0;
 unsigned long lastPressRight = 0;
 
-// on flag, set by on receive callback by led_controller
-bool on_flag_led_controller = false;
+// startup_flag flag, set by startup_flag receive callback by led_controller
+// bool on_flag_led_controller = false; // Menupunkt geht eh nur wenn Delevery success
 
 // Wireless, broadcast address receiver
-uint8_t broadcastAddress[] = { 0x08, 0x3A, 0x8D, 0xCD, 0x66, 0xAF };
+// uint8_t broadcastAddress[] = { 0x08, 0x3A, 0x8D, 0xCD, 0x66, 0xAF }; // Prototype
+uint8_t broadcastAddress[] = { 0x30, 0xED, 0xA0, 0x20, 0x92, 0xD8 }; // final
 
 const char* country_names[] = {
   "Deutschland", "Frankreich", "Italien", "Spanien", "Grossbritannien",
@@ -67,11 +68,10 @@ const char* country_names[] = {
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-static bool first_time_waiting_screen = true;
-
 // Menu
-int menu_layer = 1;
-int menu_layer_new = 0;
+static bool first_time_waiting_screen = true;
+int menu_layer = 0;
+int menu_layer_new = -2;
 
 // Spiel
 int correct_countries = 0;
@@ -115,6 +115,8 @@ void setup() {
     delay(1000);
   }
 
+  toSendStruct.startup_flag = true;
+
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("  Interaktive");
@@ -127,26 +129,7 @@ void setup() {
   lcd.print(" Nothalt-Motor");
   lcd.setCursor(0, 1);
   lcd.print(" -->[SELECT]<--");
-  delay(4000);
-
-  toSendStruct.on = true;
-  // warte auf Startnachricht von led_controller
-  while (!on_flag_led_controller || !toSendStruct.on) {
-    delay(500);
-    Serial.println("on_flag_led_controller: " + String(on_flag_led_controller) + ", toSendStruct.on: " + String(toSendStruct.on));
-    esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
-
-    // wait for led_controller, only show message the first time
-    if (first_time_waiting_screen) {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Schalten Sie die");
-      lcd.setCursor(0, 1);
-      lcd.print("SPHERE ein!");
-      first_time_waiting_screen = false;
-    }
-  }
-
+  delay(4000); 
 }
 
 void loop() {
@@ -156,22 +139,32 @@ void loop() {
   if (menu_layer != menu_layer_new) { // Sonst wird Anzeige dauerhaft neu gesetzt
     menu_layer = menu_layer_new;
   
-    if (menu_layer == 0) {
+    if (menu_layer == -2) { // Motor aus
+      pinMode(RELAIS_MOTOR, INPUT); // Relais Motor aus, würde bei HIGH nur auf 3.3V, reicht nicht um Relais zu schalten -> hochohmig
+      bitWrite(toSendStruct.data[2], 0, 0); // Standbild nicht aktiv
+      bitWrite(toSendStruct.data[2], 1, 0); // Spiel nicht aktiv
+      menu_layer_new = -1;
+    }
 
+    else if (menu_layer == -1) {
+      Serial.println("Sending startup message to LED Controller...");
+      esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
+      delay(1000);
+    }
 
-      if (on_flag_led_controller) {
-        
-        bitWrite(toSendStruct.data[2], 0, 0); // Standbild nicht aktiv
-        bitWrite(toSendStruct.data[2], 1, 0); // Spiel nicht aktiv
-        SendToSphere();
-        pinMode(RELAIS_MOTOR, INPUT); // Relais Motor aus, würde bei HIGH nur auf 3.3V, reicht nicht um Relais zu schalten -> hochohmig
+    else if (menu_layer == 0) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("  Start Motor");
+      lcd.setCursor(0, 1);
+      lcd.print("-->[START][A]<--");
+    }
 
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("  Start Motor");
-        lcd.setCursor(0, 1);
-        lcd.print("-->[START][A]<--");
-      }
+    else if (menu_layer == 101) {
+      // check for clearance if connection is still there
+      bitWrite(toSendStruct.data[2], 0, 0); // Standbild nicht aktiv
+      bitWrite(toSendStruct.data[2], 1, 0); // Spiel nicht aktiv
+      SendToSphere();
     }
 
     else if (menu_layer == 1) {
@@ -411,7 +404,7 @@ void check_buttons() {
     }
 
     if (classic.buttonStart() && (currentTime - lastPressStart > debounceInterval)) {
-      if (menu_layer == 0) menu_layer_new = 1; // Von Start Motor zu Auswahl
+      if (menu_layer == 0) menu_layer_new = 101; // Von Start Motor zu wait for clearance
       if (menu_layer == 71) menu_layer_new = 13;
       
       Serial.println("Start");
@@ -421,7 +414,7 @@ void check_buttons() {
     if (classic.buttonSelect() && (currentTime - lastPressSelect > debounceInterval)) {
       Serial.println("Select");
       pinMode(RELAIS_MOTOR, INPUT); // Relais Motor aus
-      menu_layer_new = 0; // Motor aus
+      menu_layer_new = -2; // Motor aus
       lastPressSelect = currentTime;
     }
 
@@ -559,22 +552,52 @@ bool check_country(int country) {
 // Wireless
 void SendToSphere() {
   esp_now_send(broadcastAddress, (uint8_t *)&toSendStruct, sizeof(toSendStruct));
-  Serial.println("x: " + String(toSendStruct.data[0]) + ", y: " + String(toSendStruct.data[1]));
+  //Serial.println("x: " + String(toSendStruct.data[0]) + ", y: " + String(toSendStruct.data[1]));
 }
 
 // Callback, wenn Daten gesendet werden
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   Serial.print("Last Packet Send Status: ");
-  Serial.println(sendStatus == 0 ? "Delivery success" : "Delivery fail");
-  Serial.print("x: ");
-  Serial.print(toSendStruct.data[0]);
-  Serial.print(", y: ");
-  Serial.println(toSendStruct.data[1]);
+  if (sendStatus == 0) {
+    Serial.println("Delivery success");
+    if (menu_layer == -1) {
+      //toSendStruct.startup_flag = false;
+      first_time_waiting_screen = true;
+      menu_layer_new = 0;  
+    }
+    else if (menu_layer == 101) menu_layer_new = 1; // allow Motor to start
+
+  } else {
+    Serial.println("Delivery fail");
+    menu_layer = 0; // Muss zurückgesetzt werden, um eneut in -1 zu kommen
+    menu_layer_new = -2;
+
+    if (first_time_waiting_screen) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Schalten Sie die");
+      lcd.setCursor(0, 1);
+      lcd.print("SPHERE ein!");
+      first_time_waiting_screen = false;
+      }
+  }
+  
+  if ((menu_layer == 71)||(menu_layer == 31)) {
+    Serial.print("x: ");
+    Serial.print(toSendStruct.data[0]);
+    Serial.print(", y: ");
+    Serial.println(toSendStruct.data[1]);
+  }
 }
 
 // Callback, wenn Daten empfangen werden
 void OnDataRecv(uint8_t *mac_addr, uint8_t *incomingData, uint8_t len) {
   memcpy(&receivedStruct, incomingData, sizeof(receivedStruct));
-  on_flag_led_controller = receivedStruct.on; // Set on_flag_led_controller based on received data
-  Serial.println("Received on_flag_led_controller: " + String(on_flag_led_controller));
+  
+  /*if (receivedStruct.startup_flag) {
+    Serial.println("Received startup message from LED Controller");
+    on_flag_led_controller = true;
+    toSendStruct.startup_flag = false;
+    menu_layer_new = 0;
+  }*/
 }

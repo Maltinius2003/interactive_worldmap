@@ -26,13 +26,16 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 # === 1. NORMALE MATRIX ===
 
-# Speichern als einfache Matrix-Datei
-matrix_path = os.path.join(script_dir, f"{original_name}_MATRIX.txt")
-np.savetxt(matrix_path, bool_matrix.astype(int), fmt='%d')
+# Mittleren Ausschnitt nehmen: Zeilen 1 bis 208 (Index 1 bis 208 exklusiv 209)
+cropped_matrix = bool_matrix[1:209, :]  # shape = (208, 210)
 
-# Arduino-Code-Zuweisungen
+# Speichern als einfache Matrix-Datei (mittlerer Ausschnitt)
+matrix_path = os.path.join(script_dir, f"{original_name}_MATRIX.txt")
+np.savetxt(matrix_path, cropped_matrix.astype(int), fmt='%d')
+
+# Arduino-Code-Zuweisungen (x/y vertauscht, mittlerer Ausschnitt)
 arduino_code = ""
-for row_idx, row in enumerate(bool_matrix):
+for row_idx, row in enumerate(cropped_matrix):
     for col_idx, val in enumerate(row):
         if val:
             arduino_code += f"led_matrix_blue[{col_idx}][{row_idx}] = true;\n"
@@ -43,7 +46,8 @@ with open(arduino_code_path, "w") as f:
 
 # === 2. GESPIEGELTE MATRIX ===
 
-flipped_matrix = np.flipud(bool_matrix)
+# Flip auf gesamtes Original anwenden und danach ebenfalls mittleren Bereich ausschneiden
+flipped_matrix = np.flipud(bool_matrix)[1:209, :]
 
 flipped_matrix_path = os.path.join(script_dir, f"{original_name}_MATRIX_FLIPPED.txt")
 np.savetxt(flipped_matrix_path, flipped_matrix.astype(int), fmt='%d')
