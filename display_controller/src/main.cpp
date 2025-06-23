@@ -5,7 +5,6 @@
 
 // Wireless
 #include <ESP8266WiFi.h>
-#include <ESP8266WiFi.h>
 #include <espnow.h>
 
 // NES Controller
@@ -23,14 +22,6 @@ typedef struct struct_message_to_display {
   bool startup_flag;
 } struct_message_to_display;
 
-/*const char* country_names[] = {
-  "Deutschland", "Frankreich", "Italien", "Spanien", "Grossbritannien",
-  "Russland", "Schweden", "Kanada", "USA", "Australien", "Brasilien",
-  "China", "Indien", "Argentinien", "Mexiko", "Japan", "Suedafrika",
-  "Aegypten", "Marrokko", "Algerien", "Libyen", "Saudi Arabien",
-  "Ukraine", "Kasachstan", "Iran", "Mongolei", "Daenemark", "Tuerkei"
-};*/
-
 struct_message_to_sphere toSendStruct;
 struct_message_to_display receivedStruct;
 
@@ -41,7 +32,7 @@ std::vector<int> selected_countries;
 ClassicController classic;
 
 // NES Controller Debounce
-const unsigned long debounceInterval = 200;
+const unsigned long debounceInterval = 100;
 unsigned long lastPressA = 0;
 unsigned long lastPressB = 0;
 unsigned long lastPressStart = 0;
@@ -420,11 +411,11 @@ void check_buttons() {
 
     if (classic.dpadUp() && (currentTime - lastPressUp > debounceInterval)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
-        if (toSendStruct.data[1] < 210) {
-          toSendStruct.data[1] += 1; // Example: Increment y coordinate
+        if (toSendStruct.data[1] > 0) {
+          toSendStruct.data[1] -= 2; // Example: Increment y coordinate
         }
         else {
-          toSendStruct.data[1] = 0; // Reset to 0 if it exceeds 210
+          toSendStruct.data[1] = 208; // Reset to 208 if it goes below 0
         }
         SendToSphere();
       }
@@ -434,11 +425,11 @@ void check_buttons() {
 
     if (classic.dpadDown() && (currentTime - lastPressDown > debounceInterval)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
-        if (toSendStruct.data[1] > 0) {
-          toSendStruct.data[1] -= 1; // Example: Decrement y coordinate
+        if (toSendStruct.data[1] < 208) {
+          toSendStruct.data[1] += 2; // Example: Decrement y coordinate
         }
         else {
-          toSendStruct.data[1] = 210; // Reset to 210 if it goes below 0
+          toSendStruct.data[1] = 0; // Reset to 0 if it exceeds 210
         }
         SendToSphere();
       }
@@ -449,7 +440,7 @@ void check_buttons() {
     if (classic.dpadLeft() && (currentTime - lastPressLeft > debounceInterval)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[0] > 0) {
-          toSendStruct.data[0] -= 1; // Example: Decrement x coordinate
+          toSendStruct.data[0] -= 2; // Example: Decrement x coordinate
         }
         else {
           toSendStruct.data[0] = 210; // Reset to 210 if it goes below 0
@@ -463,7 +454,7 @@ void check_buttons() {
     if (classic.dpadRight() && (currentTime - lastPressRight > debounceInterval)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[0] < 210) {
-          toSendStruct.data[0] += 1; // Example: Increment x coordinate
+          toSendStruct.data[0] += 2; // Example: Increment x coordinate
         }
         else {
           toSendStruct.data[0] = 0; // Reset to 0 if it exceeds 210
