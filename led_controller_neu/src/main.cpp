@@ -27,7 +27,6 @@ hw_timer_t *timer = NULL;
 #define FILTER_SIZE 10
 
 uint32_t timer_ticks_arr[FILTER_SIZE] = {2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024};
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 static uint32_t sum = FILTER_SIZE * 2024;  // Anfangswert (Summe aus 10×2024)
 
 
@@ -81,8 +80,8 @@ void IRAM_ATTR timer1ISR() {
   for (int j = 0; j < leds_y; j++) {
     GPIO.out_w1tc = clock_mask;
 
-    int col_blue = (210 - 1 - ((curr_column + 105) % 210)) % 210;
-    int col_red  = (210 - 1 - curr_column) % 210;
+    int col_blue = (210 - 1 - ((curr_column + 205) % 210)) % 210;
+    int col_red  = (210 - 1 - ((curr_column + 100) % 210)) % 210;
 
     if (led_matrix_blue[col_blue][j]) {
       GPIO.out_w1ts = blue_mask;
@@ -108,7 +107,7 @@ void IRAM_ATTR timer1ISR() {
 void IRAM_ATTR hallISR() {
   unsigned long now = micros();
   if (now - last_trigger_time > 10000) {
-    curr_column = 105;
+    curr_column = 155;
     rotation_time_us = now - last_trigger_time;
     last_trigger_time = now;
     new_rotation_detected = true;
@@ -118,7 +117,7 @@ void IRAM_ATTR hallISR() {
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
   memcpy(&received_struct, incomingData, sizeof(received_struct));
   if (received_struct.startup_flag == true && !to_send_struct.startup_flag) {
-    Serial.println("Recieved Startup Message from Display Controller");
+    //Serial.println("Recieved Startup Message from Display Controller");
     to_send_struct.startup_flag = true; // Set own startup flag
     esp_now_send(broadcast_address, (uint8_t *)&to_send_struct, sizeof(to_send_struct));
   }
@@ -128,7 +127,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
     set_world();
     timerAlarmEnable(timer);
   } else {
-    Serial.println("Standbild oder Spiel beendet, Timer deaktivieren");
+    //Serial.println("Standbild oder Spiel beendet, Timer deaktivieren");
     interrupts_active = false;
     set_blue_zerrro();
     set_red_zerrro();
@@ -137,9 +136,8 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
     timerAlarmDisable(timer);
   }  
 
-
   if (bitRead(received_struct.data[2], 1) == 1) {
-    Serial.println("x: " + String(received_struct.data[0]) + ", y: " + String(received_struct.data[1]));
+    //Serial.println("x: " + String(received_struct.data[0]) + ", y: " + String(received_struct.data[1]));
     led_matrix_red[old_position[0]][old_position[1]] = false;
     led_matrix_red[received_struct.data[0]][received_struct.data[1]] = true;
     old_position[0] = received_struct.data[0];
@@ -151,7 +149,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 
 void setup() {
-  Serial.begin(9600);
+  //Serial.begin(9600);
 
   pinMode(DATA_PIN_BLUE, OUTPUT);
   pinMode(DATA_PIN_RED, OUTPUT);
@@ -187,21 +185,21 @@ void setup() {
   esp_now_add_peer(&peerInfo);
 
   while (!to_send_struct.startup_flag) {
-    Serial.println("Waiting for Display Controller startup message...");
+    //Serial.println("Waiting for Display Controller startup message...");
     delay(1000);     
   }
   //to_send_struct.startup_flag = false; 
-  Serial.println("Connected to Display Controller");
+  //Serial.println("Connected to Display Controller");
 }
 
 
 void loop() {
   if (interrupts_active) {
     if (new_rotation_detected) {
-      portENTER_CRITICAL(&timerMux);
+      noInterrupts();
       unsigned long rot_time_us = rotation_time_us;
       new_rotation_detected = false;
-      portEXIT_CRITICAL(&timerMux);
+      interrupts();
 
       if (rot_time_us > 0) {
         unsigned long timerTicks = (rot_time_us * (TICK_FREQUENCY / 1000000UL)) / STEPS_PER_ROTATION;
@@ -214,7 +212,7 @@ void loop() {
         uint32_t average_ticks = sum / FILTER_SIZE;
 
         timerAlarmWrite(timer, average_ticks, true);
-        //timerRestart(timer);
+        timerRestart(timer);
       }
     }
   }
