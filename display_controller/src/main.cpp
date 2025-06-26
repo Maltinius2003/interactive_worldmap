@@ -32,7 +32,8 @@ std::vector<int> selected_countries;
 ClassicController classic;
 
 // NES Controller Debounce
-const unsigned long debounceInterval = 100;
+const unsigned long debounceInterval = 200;
+const unsigned long debounceIntervalControlPad = 100;
 unsigned long lastPressA = 0;
 unsigned long lastPressB = 0;
 unsigned long lastPressStart = 0;
@@ -105,7 +106,8 @@ void setup() {
     Serial.println("Classic Controller not detected!");
     delay(1000);
   }
-
+  toSendStruct.data[0] = 104;
+  toSendStruct.data[1] = 71;
   toSendStruct.startup_flag = true;
 
   lcd.clear();
@@ -409,7 +411,7 @@ void check_buttons() {
       lastPressSelect = currentTime;
     }
 
-    if (classic.dpadUp() && (currentTime - lastPressUp > debounceInterval)) {
+    if (classic.dpadUp() && (currentTime - lastPressUp > debounceIntervalControlPad)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[1] > 0) {
           toSendStruct.data[1] -= 2; // Example: Increment y coordinate
@@ -423,7 +425,7 @@ void check_buttons() {
       lastPressUp = currentTime;
     }
 
-    if (classic.dpadDown() && (currentTime - lastPressDown > debounceInterval)) {
+    if (classic.dpadDown() && (currentTime - lastPressDown > debounceIntervalControlPad)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[1] < 208) {
           toSendStruct.data[1] += 2; // Example: Decrement y coordinate
@@ -437,7 +439,7 @@ void check_buttons() {
       lastPressDown = currentTime;
     }
 
-    if (classic.dpadLeft() && (currentTime - lastPressLeft > debounceInterval)) {
+    if (classic.dpadLeft() && (currentTime - lastPressLeft > debounceIntervalControlPad)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[0] > 0) {
           toSendStruct.data[0] -= 2; // Example: Decrement x coordinate
@@ -451,7 +453,7 @@ void check_buttons() {
       lastPressLeft = currentTime;
     }
 
-    if (classic.dpadRight() && (currentTime - lastPressRight > debounceInterval)) {
+    if (classic.dpadRight() && (currentTime - lastPressRight > debounceIntervalControlPad)) {
       if ((menu_layer == 71)||(menu_layer == 31)) {
         if (toSendStruct.data[0] < 210) {
           toSendStruct.data[0] += 2; // Example: Increment x coordinate
@@ -482,7 +484,7 @@ bool check_country(int country) {
 bool check_country(int country) {
   switch (country) {
     case 0: // Deutschland
-      return (toSendStruct.data[0] >= 103 && toSendStruct.data[0] <= 105 && toSendStruct.data[1] >= 67 && toSendStruct.data[1] <= 75);
+      return (toSendStruct.data[0] >= 102 && toSendStruct.data[0] <= 106 && toSendStruct.data[1] >= 66 && toSendStruct.data[1] <= 76);
     case 1: // Frankreich
       return (toSendStruct.data[0] >= 99 && toSendStruct.data[0] <= 103 && toSendStruct.data[1] >= 70 && toSendStruct.data[1] <= 83);
     case 2: // Italien
@@ -532,7 +534,7 @@ bool check_country(int country) {
     case 24: // Mongolei
       return (toSendStruct.data[0] >= 145 && toSendStruct.data[0] <= 155 && toSendStruct.data[1] >= 66 && toSendStruct.data[1] <= 83);
     case 25: // Dänemark
-      return (toSendStruct.data[0] >= 105 && toSendStruct.data[0] <= 106 && toSendStruct.data[1] >= 60 && toSendStruct.data[1] <= 65);
+      return (toSendStruct.data[0] >= 103 && toSendStruct.data[0] <= 108 && toSendStruct.data[1] >= 58 && toSendStruct.data[1] <= 67);
     case 26: // Türkei
       return (toSendStruct.data[0] >= 115 && toSendStruct.data[0] <= 124 && toSendStruct.data[1] >= 84 && toSendStruct.data[1] <= 90);
     default:

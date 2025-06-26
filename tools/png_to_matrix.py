@@ -17,7 +17,8 @@ image = image.resize((210, 210))
 
 # Grauwert-Array und binäre Schwelle
 gray_array = np.array(image)
-threshold = 128
+threshold = 150
+#threshold = 135
 bool_matrix = gray_array < threshold
 
 # Dateinamen vorbereiten

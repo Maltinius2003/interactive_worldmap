@@ -52,7 +52,14 @@ void setup() {
   write_leds_sync();
 
   //set_specific_led_blue(40);
-  //set_specific_led_red(55);
+  //set_specific_led_red(181);
+  //set_specific_led_red(182);
+  //set_specific_led_red(183);
+  //set_specific_led_red(184);
+  //set_specific_led_red(185);
+  //set_specific_led_red(150);
+  //set_specific_led_red(151);
+
   //set_specific_led_blue(55);
   //every_second_on();
   //all_red_on();
